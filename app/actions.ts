@@ -417,3 +417,101 @@ export const updateDealAction = async (formData: FormData) => {
     return { success: false, error: error.message || String(error) };
   }
 };
+
+export const completeQuoteRequestAction = async (formData: FormData) => {
+  const quoteRequestId = formData.get("quoteRequestId") as string;
+  const quoteValueStr = formData.get("quoteValue") as string;
+  const leadId = formData.get("leadId") as string;
+
+  // Parse quote value (default to 0 if empty)
+  const quoteValue = quoteValueStr ? parseFloat(quoteValueStr) : 0;
+
+  if (!quoteRequestId || !quoteValue || quoteValue <= 0 || !leadId) {
+    return {
+      error:
+        "Quote request ID, lead ID, and a positive quote value are required",
+    };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "User not authenticated" };
+  }
+
+  try {
+    // Start a transaction to update both quote request and lead
+    const { error: quoteRequestError } = await supabase
+      .from("quote_requests")
+      .update({
+        status: "completed",
+        quote_value: quoteValue,
+        quoted_at: new Date().toISOString(),
+        quote_maker_id: user.id,
+      })
+      .eq("id", quoteRequestId);
+
+    if (quoteRequestError) {
+      console.error("Error updating quote request:", quoteRequestError);
+      return { error: quoteRequestError.message };
+    }
+
+    // Update the lead with the quote value and change status to quote_made
+    const { error: leadError } = await supabase
+      .from("leads")
+      .update({
+        quote_value: quoteValue,
+        status: "quote_made",
+      })
+      .eq("id", leadId);
+
+    if (leadError) {
+      console.error("Error updating lead:", leadError);
+      return { error: leadError.message };
+    }
+
+    return { success: true };
+  } catch (err) {
+    console.error("Unexpected error in completeQuoteRequestAction:", err);
+    return { error: "An unexpected error occurred" };
+  }
+};
+
+export const startWorkingOnQuoteRequestAction = async (formData: FormData) => {
+  const quoteRequestId = formData.get("quoteRequestId") as string;
+
+  if (!quoteRequestId) {
+    return { error: "Quote request ID is required" };
+  }
+
+  const supabase = await createClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "User not authenticated" };
+  }
+
+  // Update the quote request
+  const { error } = await supabase
+    .from("quote_requests")
+    .update({
+      status: "active",
+      quote_maker_id: user.id,
+    })
+    .eq("id", quoteRequestId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+};

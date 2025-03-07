@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface DonutData {
   name: string;
@@ -42,17 +43,10 @@ interface DonutChartProps {
   colors?: string[];
 }
 
-// Helper to format currency
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-};
-
 // Custom legend renderer to show clearer names and values
 const CustomLegend = (props: any) => {
   const { payload } = props;
+  const { formatCurrency } = useCurrency();
 
   if (!payload || payload.length === 0) return null;
 
@@ -89,6 +83,8 @@ export function DashboardDonutChart({
     "hsl(var(--chart-5))",
   ],
 }: DonutChartProps) {
+  const { formatCurrency } = useCurrency();
+
   // Transform data for recharts
   const chartData = React.useMemo(() => {
     return data.map((item, index) => ({

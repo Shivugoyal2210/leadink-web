@@ -24,6 +24,7 @@ import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FilterLeadsDialog } from "@/components/leads/filter-dialog";
 import { SearchLeads } from "@/components/leads/search-leads";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
+import { CurrencyCell } from "@/components/tables/currency-cell";
 
 export default async function LeadsPage({
   searchParams,
@@ -211,7 +212,9 @@ export default async function LeadsPage({
                 <TableHead>Status</TableHead>
                 <TableHead>Quote Value</TableHead>
                 <TableHead>Created</TableHead>
-                <TableHead className="w-[70px]">Actions</TableHead>
+                <TableHead className="w-[70px]">
+                  {!["quote_maker"].includes(userRole) ? "Actions" : ""}
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -230,10 +233,7 @@ export default async function LeadsPage({
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      $
-                      {lead.quote_value
-                        ? lead.quote_value.toLocaleString()
-                        : "0"}
+                      <CurrencyCell value={lead.quote_value || 0} />
                     </TableCell>
                     <TableCell>
                       {lead.lead_created_date
@@ -241,12 +241,14 @@ export default async function LeadsPage({
                         : "N/A"}
                     </TableCell>
                     <TableCell>
-                      <EditLeadDialog
-                        lead={lead}
-                        assignedToUserId={lead.assignedToUserId || ""}
-                        currentUserRole={userRole}
-                        currentUserId={user.id}
-                      />
+                      {!["quote_maker"].includes(userRole) ? (
+                        <EditLeadDialog
+                          lead={lead}
+                          assignedToUserId={lead.assignedToUserId || ""}
+                          currentUserRole={userRole}
+                          currentUserId={user.id}
+                        />
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))

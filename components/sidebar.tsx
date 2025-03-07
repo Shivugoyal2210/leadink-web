@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   ChevronLeft,
   ChevronRight,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,12 @@ export function Sidebar({ userRole }: SidebarProps) {
       href: "/deals",
       icon: ShoppingBag,
       roles: ["admin", "sales_manager", "sales_rep"],
+    },
+    {
+      name: "Quote Requests",
+      href: "/quote-requests",
+      icon: FileSpreadsheet,
+      roles: ["quote_maker", "admin"],
     },
   ];
 

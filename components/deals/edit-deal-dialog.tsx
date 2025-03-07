@@ -60,7 +60,10 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, currency } = useCurrency();
+
+  // Get the currency symbol
+  const currencySymbol = currency === "INR" ? "₹" : "$";
 
   // Initialize form with deal data
   const form = useForm<z.infer<typeof formSchema>>({
@@ -125,8 +128,14 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
   // Format the calculated total value based on currency
   const formattedTotalValue = () => {
     if (!mounted) {
-      // Default for server-side rendering
-      return `$ ${calculateTotalValue().toLocaleString()}`;
+      // Default for server-side rendering with the appropriate currency symbol
+      return `${currencySymbol} ${calculateTotalValue().toLocaleString(
+        "en-US",
+        {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        }
+      )}`;
     }
     return formatCurrency(calculateTotalValue());
   };
@@ -158,7 +167,7 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       name="amountIn"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Net Amount ($)</FormLabel>
+                          <FormLabel>Net Amount ({currencySymbol})</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -178,7 +187,7 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       name="taxAmount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Tax Amount ($)</FormLabel>
+                          <FormLabel>Tax Amount ({currencySymbol})</FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -200,7 +209,9 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       name="middlemanCut"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Middleman Cut ($)</FormLabel>
+                          <FormLabel>
+                            Middleman Cut ({currencySymbol})
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
@@ -220,7 +231,9 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       name="amountReceived"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Amount Received ($)</FormLabel>
+                          <FormLabel>
+                            Amount Received ({currencySymbol})
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"

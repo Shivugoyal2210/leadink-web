@@ -36,6 +36,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface CashFlowData {
   month: string;
@@ -49,20 +50,14 @@ interface CashFlowChartProps {
   years: string[];
 }
 
-// Helper to format currency
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-};
-
 export function CashFlowChart({
   data,
   selectedYear,
   onYearChange,
   years,
 }: CashFlowChartProps) {
+  const { formatCurrency } = useCurrency();
+
   return (
     <Card className="col-span-2">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -99,7 +94,11 @@ export function CashFlowChart({
                 </linearGradient>
               </defs>
               <XAxis dataKey="month" />
-              <YAxis tickFormatter={(value) => `$${value.toLocaleString()}`} />
+              <YAxis
+                tickFormatter={(value) =>
+                  formatCurrency(value).split(" ")[0] + value.toLocaleString()
+                }
+              />
               <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
               <Tooltip
                 formatter={(value) => formatCurrency(Number(value))}

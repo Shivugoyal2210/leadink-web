@@ -1,11 +1,23 @@
+"use client";
+
 import { Card, CardContent } from "@/components/ui/card";
 import { Order } from "@/utils/supabase/types";
+import { useCurrency } from "@/contexts/currency-context";
+import { useEffect, useState } from "react";
 
 interface StatsDisplayProps {
   deals: Order[];
 }
 
 export function StatsDisplay({ deals }: StatsDisplayProps) {
+  const [mounted, setMounted] = useState(false);
+  const { formatCurrency } = useCurrency();
+
+  // Wait until component is mounted
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Calculate totals
   const totals = deals.reduce(
     (acc, deal) => {
@@ -23,6 +35,18 @@ export function StatsDisplay({ deals }: StatsDisplayProps) {
     { netAmount: 0, amountReceived: 0, totalValue: 0 }
   );
 
+  // Format for display based on mounted state
+  const formatAmount = (amount: number) => {
+    if (!mounted) {
+      // Default USD formatting for server-side rendering
+      return `$ ${amount.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
+    }
+    return formatCurrency(amount);
+  };
+
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card>
@@ -32,7 +56,7 @@ export function StatsDisplay({ deals }: StatsDisplayProps) {
               Net Amount
             </span>
             <span className="text-2xl font-bold">
-              ${totals.netAmount.toLocaleString()}
+              {formatAmount(totals.netAmount)}
             </span>
           </div>
         </CardContent>
@@ -45,7 +69,7 @@ export function StatsDisplay({ deals }: StatsDisplayProps) {
               Amount Received
             </span>
             <span className="text-2xl font-bold">
-              ${totals.amountReceived.toLocaleString()}
+              {formatAmount(totals.amountReceived)}
             </span>
           </div>
         </CardContent>
@@ -58,7 +82,7 @@ export function StatsDisplay({ deals }: StatsDisplayProps) {
               Total Value
             </span>
             <span className="text-2xl font-bold">
-              ${totals.totalValue.toLocaleString()}
+              {formatAmount(totals.totalValue)}
             </span>
           </div>
         </CardContent>

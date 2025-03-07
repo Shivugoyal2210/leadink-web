@@ -37,6 +37,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Lead } from "@/utils/supabase/types";
+import { useCurrency } from "@/contexts/currency-context";
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -78,6 +79,10 @@ export function EditLeadDialog({
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
+  const { currency } = useCurrency();
+
+  // Get the currency symbol
+  const currencySymbol = currency === "INR" ? "₹" : "$";
 
   // Initialize form with lead data
   const form = useForm<z.infer<typeof formSchema>>({
@@ -147,7 +152,9 @@ export function EditLeadDialog({
 
   // Determine if user can change assignments
   const canChangeAssignment =
-    currentUserRole === "admin" || currentUserRole === "lead_assigner";
+    currentUserRole === "admin" ||
+    currentUserRole === "lead_assigner" ||
+    currentUserRole === "quote_maker";
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -307,7 +314,7 @@ export function EditLeadDialog({
                       name="quoteValue"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quote Value ($)</FormLabel>
+                          <FormLabel>Quote Value ({currencySymbol})</FormLabel>
                           <FormControl>
                             <Input
                               type="number"

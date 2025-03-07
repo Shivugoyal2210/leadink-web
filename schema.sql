@@ -488,6 +488,42 @@ CREATE POLICY "users_can_update_leads_they_own_or_admin_can_update_any" ON "publ
 
 
 
+DROP POLICY IF EXISTS "quote_makers_can_update_leads" ON "public"."leads";
+
+CREATE POLICY "quote_makers_can_update_leads" ON "public"."leads" 
+FOR UPDATE TO "authenticated" 
+USING (
+  (
+    SELECT role 
+    FROM public.users 
+    WHERE id = auth.uid()
+  ) = 'quote_maker'
+) 
+WITH CHECK (
+  (
+    SELECT role 
+    FROM public.users 
+    WHERE id = auth.uid()
+  ) = 'quote_maker'
+  -- Only allow changes to status and quote_value fields
+  AND (
+    -- Ensure all other fields remain unchanged
+    name = name
+    AND address = address
+    AND property_type = property_type
+    AND company = company
+    AND architect_name = architect_name
+    AND phone_number = phone_number
+    AND next_follow_up_date = next_follow_up_date
+    AND notes = notes
+    AND lead_created_date = lead_created_date
+    AND lead_found_through = lead_found_through
+    -- Only allow status to be set to 'quote_made'
+    AND (status = status OR status = 'quote_made')
+    -- Allow quote_value to be changed
+  )
+);
+
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
@@ -789,3 +825,14 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 RESET ALL;
+
+-- Add policy to allow quote makers to create lead assignments
+CREATE POLICY "quote_makers_can_create_lead_assignments" ON "public"."lead_assignments" 
+FOR INSERT TO "authenticated" 
+WITH CHECK (
+  (
+    SELECT role 
+    FROM public.users 
+    WHERE id = auth.uid()
+  ) = 'quote_maker'
+);

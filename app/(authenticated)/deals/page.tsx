@@ -24,6 +24,7 @@ import { redirect } from "next/navigation";
 import { FilterDealsDialog } from "@/components/deals/filter-dialog";
 import { StatsDisplay } from "@/components/deals/stats-display-currency";
 import { EditDealDialog } from "@/components/deals/edit-deal-dialog";
+import { CurrencyCell } from "@/components/tables/currency-cell";
 
 export default async function DealsPage({
   searchParams,
@@ -153,23 +154,16 @@ export default async function DealsPage({
                       {deal.sales_rep?.full_name || "Unknown"}
                     </TableCell>
                     <TableCell>
-                      ${deal.amount_in ? deal.amount_in.toLocaleString() : "0"}
+                      <CurrencyCell value={deal.amount_in || 0} />
                     </TableCell>
                     <TableCell>
-                      $
-                      {deal.tax_amount ? deal.tax_amount.toLocaleString() : "0"}
+                      <CurrencyCell value={deal.tax_amount || 0} />
                     </TableCell>
                     <TableCell>
-                      $
-                      {deal.middleman_cut
-                        ? deal.middleman_cut.toLocaleString()
-                        : "0"}
+                      <CurrencyCell value={deal.middleman_cut || 0} />
                     </TableCell>
                     <TableCell className="font-semibold">
-                      $
-                      {deal.total_value
-                        ? deal.total_value.toLocaleString()
-                        : "0"}
+                      <CurrencyCell value={deal.total_value || 0} />
                     </TableCell>
                     <TableCell>
                       <Badge className={getStatusBadgeColor(deal.status)}>

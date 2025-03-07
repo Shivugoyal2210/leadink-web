@@ -6,6 +6,7 @@ import { DashboardDonutChart } from "@/components/dashboard/donut-chart";
 import { CashFlowChart } from "@/components/dashboard/cash-flow-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, DollarSign, Users, TrendingUp } from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
 
 // Define interfaces for chart data
 interface OrderData {
@@ -52,14 +53,6 @@ interface DashboardClientProps {
   initialConversionRate: number;
 }
 
-// Helper to format currency
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-};
-
 export function DashboardClient({
   initialUserRole,
   initialUserId,
@@ -68,6 +61,7 @@ export function DashboardClient({
   initialTotalRevenue,
   initialConversionRate,
 }: DashboardClientProps) {
+  const { formatCurrency } = useCurrency();
   const [userRole] = useState<string>(initialUserRole);
   const [salesPeople, setSalesPeople] = useState<any[]>([]);
   const [selectedYear, setSelectedYear] = useState<string>(

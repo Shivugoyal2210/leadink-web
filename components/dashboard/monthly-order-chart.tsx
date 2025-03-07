@@ -35,6 +35,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { TrendingUp } from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface OrderData {
   month: string;
@@ -48,14 +49,6 @@ interface MonthlyOrderChartProps {
   onYearChange: (year: string) => void;
   years: string[];
 }
-
-// Helper to format currency
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(value);
-};
 
 const chartConfig = {
   "Total Value": {
@@ -74,6 +67,8 @@ export function MonthlyOrderChart({
   onYearChange,
   years,
 }: MonthlyOrderChartProps) {
+  const { formatCurrency } = useCurrency();
+
   return (
     <Card className="col-span-2 flex flex-col w-full max-w-full">
       <CardHeader className="flex flex-row items-center justify-between">
@@ -115,7 +110,9 @@ export function MonthlyOrderChart({
                 interval="preserveStartEnd"
               />
               <YAxis
-                tickFormatter={(value) => `$${value.toLocaleString()}`}
+                tickFormatter={(value) =>
+                  formatCurrency(value).split(" ")[0] + value.toLocaleString()
+                }
                 tickLine={false}
                 axisLine={false}
                 fontSize={11}
