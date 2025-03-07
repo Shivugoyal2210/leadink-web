@@ -7,6 +7,7 @@ import { Geist } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import Link from "next/link";
 import { Toaster } from "sonner";
+import { CurrencyProvider } from "@/contexts/currency-context";
 import "./globals.css";
 
 const defaultUrl = process.env.VERCEL_URL
@@ -38,8 +39,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster position="top-right" />
+          <CurrencyProvider>
+            {children}
+            <Toaster position="top-right" />
+          </CurrencyProvider>
         </ThemeProvider>
       </body>
     </html>

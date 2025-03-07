@@ -22,7 +22,7 @@ import { PlusCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { redirect } from "next/navigation";
 import { FilterDealsDialog } from "@/components/deals/filter-dialog";
-import { StatsDisplay } from "@/components/deals/stats-display";
+import { StatsDisplay } from "@/components/deals/stats-display-currency";
 import { EditDealDialog } from "@/components/deals/edit-deal-dialog";
 
 export default async function DealsPage({

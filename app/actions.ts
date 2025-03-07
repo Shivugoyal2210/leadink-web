@@ -374,6 +374,7 @@ export const updateDealAction = async (formData: FormData) => {
   const status = formData.get("status") as string;
   const notes = formData.get("notes") as string;
   const amountReceived = parseFloat(formData.get("amountReceived") as string);
+  const finalSizeDate = formData.get("finalSizeDate") as string;
 
   if (!orderId) {
     return { error: "Missing order ID" };
@@ -388,6 +389,10 @@ export const updateDealAction = async (formData: FormData) => {
   if (status) updates.status = status;
   if (notes) updates.notes = notes;
   if (!isNaN(amountReceived)) updates.amount_recieved = amountReceived;
+  // Add finalSizeDate to updates if provided, or set to null if cleared
+  if (finalSizeDate !== null) {
+    updates.final_size_date = finalSizeDate || null;
+  }
 
   // Note: total_value is not included in updates as it's calculated by the database
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { updateDealAction } from "@/app/actions";
 import {
@@ -37,6 +37,7 @@ import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 import { Order } from "@/utils/supabase/types";
+import { useCurrency } from "@/contexts/currency-context";
 
 // Define form schema with Zod
 const formSchema = z.object({
@@ -47,6 +48,7 @@ const formSchema = z.object({
   status: z.enum(["pending", "active", "completed"]),
   notes: z.string().optional(),
   amountReceived: z.coerce.number().min(0, "Amount received must be positive"),
+  finalSizeDate: z.string().optional(),
 });
 
 interface EditDealDialogProps {
@@ -56,7 +58,9 @@ interface EditDealDialogProps {
 export function EditDealDialog({ deal }: EditDealDialogProps) {
   const [open, setOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const { formatCurrency } = useCurrency();
 
   // Initialize form with deal data
   const form = useForm<z.infer<typeof formSchema>>({
@@ -69,8 +73,16 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
       status: deal.status,
       notes: deal.notes || "",
       amountReceived: deal.amount_recieved || 0,
+      finalSizeDate: deal.final_size_date
+        ? new Date(deal.final_size_date).toISOString().split("T")[0]
+        : undefined,
     },
   });
+
+  // Wait until component is mounted to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle form submission
   async function onSubmit(values: z.infer<typeof formSchema>) {
@@ -108,6 +120,15 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
 
     // Add them as numbers and return the result
     return amountIn + taxAmount + middlemanCut;
+  };
+
+  // Format the calculated total value based on currency
+  const formattedTotalValue = () => {
+    if (!mounted) {
+      // Default for server-side rendering
+      return `$ ${calculateTotalValue().toLocaleString()}`;
+    }
+    return formatCurrency(calculateTotalValue());
   };
 
   return (
@@ -244,20 +265,36 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       )}
                     />
 
-                    <div className="flex flex-col justify-end">
-                      <FormLabel>
-                        Total Value ($){" "}
-                        <span className="text-xs text-muted-foreground">
-                          (auto-calculated)
-                        </span>
-                      </FormLabel>
-                      <div className="h-10 flex items-center px-3 border rounded-md text-muted-foreground bg-muted/50">
-                        ${calculateTotalValue().toLocaleString()}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Calculated from Net Amount + Tax + Middleman Cut
-                      </p>
+                    <FormField
+                      control={form.control}
+                      name="finalSizeDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Final Size Date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              placeholder="Select date"
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex flex-col justify-end">
+                    <div className="text-sm mb-1 text-muted-foreground">
+                      Total Value
                     </div>
+                    <div className="text-lg font-semibold">
+                      {formattedTotalValue()}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Calculated from Net Amount + Tax + Middleman Cut
+                    </p>
                   </div>
 
                   <FormField

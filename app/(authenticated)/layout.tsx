@@ -6,6 +6,7 @@ import { UserRole } from "@/utils/supabase/types";
 import { getUserRole } from "@/utils/supabase/database";
 import { Button } from "@/components/ui/button";
 import { signOutAction } from "@/app/actions";
+import { CurrencySwitcher } from "@/components/currency-switcher";
 
 export default async function AuthenticatedLayout({
   children,
@@ -38,6 +39,7 @@ export default async function AuthenticatedLayout({
         <header className="flex items-center justify-between p-4 border-b">
           <h1 className="text-xl font-semibold">LeadInk</h1>
           <div className="flex items-center gap-4">
+            <CurrencySwitcher />
             <form action={signOutAction}>
               <Button type="submit" variant="outline" size="sm">
                 Sign out

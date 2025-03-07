@@ -76,6 +76,7 @@ export interface Order {
   status: OrderStatus;
   notes?: string;
   amount_recieved: number;
+  final_size_date?: string; // Added field for final size date
   // Joined fields
   leads?: Lead;
   sales_rep?: {
