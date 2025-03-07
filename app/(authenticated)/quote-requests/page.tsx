@@ -26,8 +26,13 @@ import { redirect } from "next/navigation";
 export default async function QuoteRequestsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<any>;
 }) {
+  // Cast searchParams to a usable type
+  const params = (await searchParams) as {
+    [key: string]: string | string[] | undefined;
+  };
+
   const supabase = await createServerClient();
 
   // Get current user
@@ -49,7 +54,7 @@ export default async function QuoteRequestsPage({
 
   // Extract search query
   const searchQuery =
-    typeof searchParams.search === "string" ? searchParams.search.trim() : "";
+    typeof params.search === "string" ? params.search.trim() : "";
 
   // Fetch quote requests
   let query = supabase.from("quote_requests").select(`

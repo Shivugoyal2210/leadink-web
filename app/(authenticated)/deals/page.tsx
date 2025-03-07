@@ -29,8 +29,13 @@ import { CurrencyCell } from "@/components/tables/currency-cell";
 export default async function DealsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<any>;
 }) {
+  // Cast searchParams to a usable type
+  const params = (await searchParams) as {
+    [key: string]: string | string[] | undefined;
+  };
+
   const supabase = await createServerClient();
 
   // Get current user
@@ -52,17 +57,29 @@ export default async function DealsPage({
 
   const isAdmin = userRole === "admin";
 
+  // Fetch deals based on role and filters
+  let query = supabase.from("orders").select(`
+    *,
+    leads:lead_id (
+      name,
+      address,
+      property_type
+    ),
+    sales_rep:sales_rep_id (
+      id,
+      full_name
+    )
+  `);
+
   // Extract filters from search params
   const salesPersonFilter =
-    isAdmin &&
-    typeof searchParams.salesPersonId === "string" &&
-    searchParams.salesPersonId !== "all"
-      ? searchParams.salesPersonId
+    typeof params.salesPersonId === "string" && params.salesPersonId !== "all"
+      ? params.salesPersonId
       : undefined;
 
   const monthFilter =
-    typeof searchParams.month === "string" && searchParams.month !== "all"
-      ? searchParams.month
+    typeof params.month === "string" && params.month !== "all"
+      ? params.month
       : undefined;
 
   const filters = {

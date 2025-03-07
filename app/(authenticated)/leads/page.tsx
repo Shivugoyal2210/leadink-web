@@ -29,8 +29,13 @@ import { CurrencyCell } from "@/components/tables/currency-cell";
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | string[] | undefined };
+  searchParams: Promise<any>;
 }) {
+  // Cast searchParams to a usable type
+  const params = (await searchParams) as {
+    [key: string]: string | string[] | undefined;
+  };
+
   const supabase = await createServerClient();
 
   // Get current user
@@ -55,14 +60,13 @@ export default async function LeadsPage({
 
   // Safely extract the sales person filter value
   const salesPersonFilter =
-    typeof searchParams.salesPersonId === "string" &&
-    searchParams.salesPersonId !== "all"
-      ? searchParams.salesPersonId
+    typeof params.salesPersonId === "string" && params.salesPersonId !== "all"
+      ? params.salesPersonId
       : null;
 
   // Extract search query
   const searchQuery =
-    typeof searchParams.search === "string" ? searchParams.search.trim() : "";
+    typeof params.search === "string" ? params.search.trim() : "";
 
   // For sales_rep, only show leads assigned to them
   if (userRole === "sales_rep") {
