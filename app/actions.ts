@@ -212,3 +212,19 @@ export const addLeadAction = async (formData: FormData) => {
 
   return { success: true, leadId: lead.id };
 };
+
+export const getLeadAssignmentsAction = async (salesPersonId: string) => {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("lead_assignments")
+    .select("lead_id")
+    .eq("user_id", salesPersonId);
+
+  if (error) {
+    console.error("Error fetching lead assignments:", error);
+    return [];
+  }
+
+  return data || [];
+};

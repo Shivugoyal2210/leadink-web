@@ -21,8 +21,13 @@ import { Button } from "@/components/ui/button";
 import { PlusCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
+import { FilterLeadsDialog } from "@/components/leads/filter-dialog";
 
-export default async function LeadsPage() {
+export default async function LeadsPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -37,15 +42,22 @@ export default async function LeadsPage() {
   // Get user role
   const userRole = (await getUserRole(user.id)) as UserRole;
 
-  // Fetch leads based on role
+  // Fetch leads based on role and filters
   let query = supabase.from("leads").select("*");
+
+  // Safely extract the sales person filter value
+  const salesPersonFilter =
+    typeof searchParams.salesPersonId === "string" &&
+    searchParams.salesPersonId !== "all"
+      ? searchParams.salesPersonId
+      : null;
 
   // For sales_rep, only show leads assigned to them
   if (userRole === "sales_rep") {
     const { data: assignedLeads } = await supabase
       .from("lead_assignments")
       .select("lead_id")
-      .eq("sales_rep_id", user.id);
+      .eq("user_id", user.id);
 
     if (assignedLeads && assignedLeads.length > 0) {
       const leadIds = assignedLeads.map((assignment) => assignment.lead_id);
@@ -56,13 +68,48 @@ export default async function LeadsPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-            <AddLeadDialog />
+            <div className="flex items-center gap-3">
+              <FilterLeadsDialog />
+              <AddLeadDialog />
+            </div>
           </div>
           <Card>
             <CardHeader>
               <CardTitle>No Leads Found</CardTitle>
               <CardDescription>
                 You don't have any leads assigned to you yet.
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
+      );
+    }
+  } else if (salesPersonFilter) {
+    // If there's a sales person filter and the user is not a sales_rep
+    const { data: assignedLeads } = await supabase
+      .from("lead_assignments")
+      .select("lead_id")
+      .eq("user_id", salesPersonFilter);
+
+    if (assignedLeads && assignedLeads.length > 0) {
+      const leadIds = assignedLeads.map((assignment) => assignment.lead_id);
+      query = query.in("id", leadIds);
+    } else {
+      // If no leads are assigned to the filtered sales person
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
+            <div className="flex items-center gap-3">
+              <FilterLeadsDialog />
+              <AddLeadDialog />
+            </div>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>No Leads Found</CardTitle>
+              <CardDescription>
+                No leads are assigned to the selected sales person.
               </CardDescription>
             </CardHeader>
           </Card>
@@ -95,7 +142,10 @@ export default async function LeadsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-        <AddLeadDialog />
+        <div className="flex items-center gap-3">
+          <FilterLeadsDialog />
+          <AddLeadDialog />
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
