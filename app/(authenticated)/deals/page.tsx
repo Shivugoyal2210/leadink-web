@@ -1,0 +1,170 @@
+import { createServerClient } from "@/utils/supabase";
+import { getDeals, getUserRole } from "@/utils/supabase/database";
+import { Order, UserRole } from "@/utils/supabase/types";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { PlusCircle, Search, Filter } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { redirect } from "next/navigation";
+
+export default async function DealsPage() {
+  const supabase = await createServerClient();
+
+  // Get current user
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return null;
+  }
+
+  // Get user role
+  const userRole = (await getUserRole(user.id)) as UserRole;
+
+  // Check if user has access to deals page
+  if (!["admin", "sales_manager", "sales_rep"].includes(userRole)) {
+    redirect("/dashboard");
+  }
+
+  // Fetch deals based on role
+  const { success, data: deals, error } = await getDeals(user.id, userRole);
+
+  if (!success) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">Deals</h1>
+        <Card>
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+            <CardDescription>
+              {error ? String(error) : "There was an error fetching deals."}
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  // Function to get badge color based on order status
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case "pending":
+        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
+      case "active":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
+      case "completed":
+        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
+      default:
+        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Deals</h1>
+        <Button className="flex items-center gap-2">
+          <PlusCircle className="h-4 w-4" />
+          Add Deal
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input type="search" placeholder="Search deals..." className="pl-8" />
+        </div>
+        <Button variant="outline" size="icon">
+          <Filter className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Lead</TableHead>
+                <TableHead>Sales Rep</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Tax</TableHead>
+                <TableHead>Middleman Cut</TableHead>
+                <TableHead>Total Value</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Date</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {deals && deals.length > 0 ? (
+                deals.map((deal: Order) => (
+                  <TableRow key={deal.id}>
+                    <TableCell className="font-medium">
+                      {deal.leads?.name || "Unknown Lead"}
+                    </TableCell>
+                    <TableCell>
+                      {deal.sales_rep?.full_name || "Unknown"}
+                    </TableCell>
+                    <TableCell>
+                      ${deal.amount_in ? deal.amount_in.toLocaleString() : "0"}
+                    </TableCell>
+                    <TableCell>
+                      $
+                      {deal.tax_amount ? deal.tax_amount.toLocaleString() : "0"}
+                    </TableCell>
+                    <TableCell>
+                      $
+                      {deal.middleman_cut
+                        ? deal.middleman_cut.toLocaleString()
+                        : "0"}
+                    </TableCell>
+                    <TableCell className="font-semibold">
+                      $
+                      {deal.total_value
+                        ? deal.total_value.toLocaleString()
+                        : "0"}
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusBadgeColor(deal.status)}>
+                        {deal.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {deal.order_date
+                        ? new Date(deal.order_date).toLocaleDateString()
+                        : "N/A"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="text-center py-6 text-muted-foreground"
+                  >
+                    No deals found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
