@@ -1,0 +1,13 @@
+{
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "framework": "nextjs",
+  "outputDirectory": ".next",
+  "redirects": [
+    {
+      "source": "/(unauthenticated)",
+      "destination": "/sign-in",
+      "permanent": false
+    }
+  ]
+}
