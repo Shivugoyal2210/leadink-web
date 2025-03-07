@@ -17,8 +17,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Import Tremor components directly - these are client-safe
-import { AreaChart, DonutChart } from "@tremor/react";
 
 import * as RechartsPrimitive from "recharts";
 
