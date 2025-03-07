@@ -362,3 +362,53 @@ export const getLeadAssignedUserAction = async (leadId: string) => {
 
   return data.user_id;
 };
+
+export const updateDealAction = async (formData: FormData) => {
+  const supabase = await createClient();
+
+  // Extract deal data from form
+  const orderId = formData.get("orderId") as string;
+  const amountIn = parseFloat(formData.get("amountIn") as string);
+  const taxAmount = parseFloat(formData.get("taxAmount") as string);
+  const middlemanCut = parseFloat(formData.get("middlemanCut") as string);
+  const status = formData.get("status") as string;
+  const notes = formData.get("notes") as string;
+  const amountReceived = parseFloat(formData.get("amountReceived") as string);
+
+  if (!orderId) {
+    return { error: "Missing order ID" };
+  }
+
+  // Prepare update data
+  const updates: Record<string, any> = {};
+
+  if (!isNaN(amountIn)) updates.amount_in = amountIn;
+  if (!isNaN(taxAmount)) updates.tax_amount = taxAmount;
+  if (!isNaN(middlemanCut)) updates.middleman_cut = middlemanCut;
+  if (status) updates.status = status;
+  if (notes) updates.notes = notes;
+  if (!isNaN(amountReceived)) updates.amount_recieved = amountReceived;
+
+  // Note: total_value is not included in updates as it's calculated by the database
+
+  console.log("Updating deal with data:", { orderId, ...updates });
+
+  // Update deal
+  try {
+    const { data, error } = await supabase
+      .from("orders")
+      .update(updates)
+      .eq("id", orderId)
+      .select();
+
+    if (error) {
+      console.error("Error updating deal:", error);
+      return { success: false, error: error.message };
+    }
+
+    return { success: true, data };
+  } catch (error: any) {
+    console.error("Exception updating deal:", error);
+    return { success: false, error: error.message || String(error) };
+  }
+};

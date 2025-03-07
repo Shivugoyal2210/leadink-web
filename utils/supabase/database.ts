@@ -107,7 +107,7 @@ export async function updateDeal({
     if (status !== undefined) updates.status = status;
     if (notes !== undefined) updates.notes = notes;
     if (amountReceived !== undefined) updates.amount_recieved = amountReceived;
-
+    console.log(updates);
     const { data, error } = await supabase
       .from("orders")
       .update(updates)

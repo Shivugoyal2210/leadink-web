@@ -22,6 +22,8 @@ import { PlusCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { redirect } from "next/navigation";
 import { FilterDealsDialog } from "@/components/deals/filter-dialog";
+import { StatsDisplay } from "@/components/deals/stats-display";
+import { EditDealDialog } from "@/components/deals/edit-deal-dialog";
 
 export default async function DealsPage({
   searchParams,
@@ -47,9 +49,11 @@ export default async function DealsPage({
     redirect("/dashboard");
   }
 
+  const isAdmin = userRole === "admin";
+
   // Extract filters from search params
   const salesPersonFilter =
-    userRole === "admin" &&
+    isAdmin &&
     typeof searchParams.salesPersonId === "string" &&
     searchParams.salesPersonId !== "all"
       ? searchParams.salesPersonId
@@ -117,8 +121,10 @@ export default async function DealsPage({
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input type="search" placeholder="Search deals..." className="pl-8" />
         </div>
-        <FilterDealsDialog isAdmin={userRole === "admin"} />
+        <FilterDealsDialog isAdmin={isAdmin} />
       </div>
+
+      <StatsDisplay deals={deals || []} />
 
       <Card>
         <CardContent className="p-0">
@@ -133,6 +139,7 @@ export default async function DealsPage({
                 <TableHead>Total Value</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Date</TableHead>
+                {isAdmin && <TableHead className="w-[70px]">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -174,12 +181,17 @@ export default async function DealsPage({
                         ? new Date(deal.order_date).toLocaleDateString()
                         : "N/A"}
                     </TableCell>
+                    {isAdmin && (
+                      <TableCell>
+                        <EditDealDialog deal={deal} />
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={8}
+                    colSpan={isAdmin ? 9 : 8}
                     className="text-center py-6 text-muted-foreground"
                   >
                     No deals found

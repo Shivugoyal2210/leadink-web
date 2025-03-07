@@ -67,9 +67,11 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA "extensions";
 
 CREATE TYPE "public"."lead_found_through" AS ENUM (
     'scanner',
-    'ads',
+    'sunny',
     'social_media',
-    'organic'
+    'word_of_mouth',
+    'social_media_ads',
+    'architect'
 );
 
 
@@ -127,6 +129,58 @@ CREATE TYPE "public"."user_role" AS ENUM (
 
 
 ALTER TYPE "public"."user_role" OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."create_order_from_won_lead"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    AS $$
+BEGIN
+  -- Only proceed if the lead status is being changed to 'won'
+  IF (NEW.status = 'won' AND (OLD.status IS NULL OR OLD.status <> 'won')) THEN
+    -- Find the sales rep assigned to this lead
+    -- We'll use the first one if there are multiple
+    DECLARE
+      assigned_sales_rep_id UUID;
+    BEGIN
+      SELECT user_id INTO assigned_sales_rep_id
+      FROM public.lead_assignments
+      WHERE lead_id = NEW.id
+      LIMIT 1;
+      
+      -- If no assignment found, use the user who updated the lead
+      IF assigned_sales_rep_id IS NULL THEN
+        assigned_sales_rep_id := auth.uid();
+      END IF;
+
+      -- Create the order
+      INSERT INTO public.orders (
+        lead_id,
+        sales_rep_id,
+        amount_in,
+        tax_amount,
+        middleman_cut,
+        status,
+        notes,
+        amount_recieved
+      ) VALUES (
+        NEW.id,                           -- lead_id
+        assigned_sales_rep_id,            -- sales_rep_id
+        COALESCE(NEW.quote_value, 0),     -- amount_in (use quote_value if available, otherwise 0)
+        0,                                -- tax_amount
+        0,                                -- middleman_cut
+        'pending',                        -- status
+        'Automatically created from won lead: ' || COALESCE(NEW.notes, ''),  -- notes
+        0                                 -- amount_recieved
+      );
+    END;
+  END IF;
+  
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."create_order_from_won_lead"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -191,7 +245,8 @@ CREATE TABLE IF NOT EXISTS "public"."orders" (
     "order_date" timestamp with time zone DEFAULT "now"(),
     "status" "public"."order_status" DEFAULT 'pending'::"public"."order_status",
     "notes" "text",
-    "amount_recieved" numeric DEFAULT '0'::numeric
+    "amount_recieved" numeric DEFAULT '0'::numeric,
+    "final_size_date" "date"
 );
 
 
@@ -270,6 +325,10 @@ CREATE INDEX "idx_leads_status" ON "public"."leads" USING "btree" ("status");
 
 
 
+CREATE OR REPLACE TRIGGER "trigger_create_order_from_won_lead" AFTER UPDATE ON "public"."leads" FOR EACH ROW EXECUTE FUNCTION "public"."create_order_from_won_lead"();
+
+
+
 ALTER TABLE ONLY "public"."lead_assignments"
     ADD CONSTRAINT "lead_assignments_lead_id_fkey" FOREIGN KEY ("lead_id") REFERENCES "public"."leads"("id") ON DELETE CASCADE;
 
@@ -313,6 +372,28 @@ ALTER TABLE ONLY "public"."users"
 CREATE POLICY "Admins can delete quote requests" ON "public"."quote_requests" FOR DELETE USING ((( SELECT "users"."role"
    FROM "public"."users"
   WHERE ("users"."id" = "auth"."uid"())) = 'admin'::"public"."user_role"));
+
+
+
+CREATE POLICY "Allow admins and sales managers to delete lead assignments" ON "public"."lead_assignments" FOR DELETE USING ((( SELECT "users"."role"
+   FROM "public"."users"
+  WHERE ("users"."id" = "auth"."uid"())) = ANY (ARRAY['admin'::"public"."user_role", 'sales_manager'::"public"."user_role"])));
+
+
+
+CREATE POLICY "Allow users to create new orders via function" ON "public"."orders" FOR INSERT TO "authenticated" WITH CHECK ((( SELECT "auth"."uid"() AS "uid") IS NOT NULL));
+
+
+
+CREATE POLICY "Enable delete for users based on user_id" ON "public"."lead_assignments" FOR DELETE USING ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
+CREATE POLICY "Enable insert for authenticated users only" ON "public"."lead_assignments" FOR INSERT TO "authenticated" WITH CHECK (true);
+
+
+
+CREATE POLICY "Enable insert for authenticated users only" ON "public"."leads" FOR INSERT TO "authenticated" WITH CHECK (true);
 
 
 
@@ -372,6 +453,14 @@ ALTER TABLE "public"."lead_assignments" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."leads" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "only_admins_can_update_orders" ON "public"."orders" FOR UPDATE TO "authenticated" USING (("auth"."uid"() IN ( SELECT "users"."id"
+   FROM "public"."users"
+  WHERE ("users"."role" = 'admin'::"public"."user_role")))) WITH CHECK (("auth"."uid"() IN ( SELECT "users"."id"
+   FROM "public"."users"
+  WHERE ("users"."role" = 'admin'::"public"."user_role"))));
+
+
+
 ALTER TABLE "public"."orders" ENABLE ROW LEVEL SECURITY;
 
 
@@ -379,6 +468,24 @@ ALTER TABLE "public"."quote_requests" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
+
+
+CREATE POLICY "users_can_see_their_own_orders_or_admin_can_see_all" ON "public"."orders" FOR SELECT TO "authenticated" USING ((("auth"."uid"() IN ( SELECT "users"."id"
+   FROM "public"."users"
+  WHERE ("users"."role" = 'admin'::"public"."user_role"))) OR ("sales_rep_id" = "auth"."uid"())));
+
+
+
+CREATE POLICY "users_can_update_leads_they_own_or_admin_can_update_any" ON "public"."leads" FOR UPDATE TO "authenticated" USING ((("auth"."uid"() IN ( SELECT "users"."id"
+   FROM "public"."users"
+  WHERE ("users"."role" = 'admin'::"public"."user_role"))) OR ("auth"."uid"() IN ( SELECT "lead_assignments"."user_id"
+   FROM "public"."lead_assignments"
+  WHERE ("lead_assignments"."lead_id" = "leads"."id"))))) WITH CHECK ((("auth"."uid"() IN ( SELECT "users"."id"
+   FROM "public"."users"
+  WHERE ("users"."role" = 'admin'::"public"."user_role"))) OR ("auth"."uid"() IN ( SELECT "lead_assignments"."user_id"
+   FROM "public"."lead_assignments"
+  WHERE ("lead_assignments"."lead_id" = "leads"."id")))));
+
 
 
 
@@ -567,6 +674,12 @@ GRANT USAGE ON SCHEMA "public" TO "service_role";
 
 
 
+
+
+
+GRANT ALL ON FUNCTION "public"."create_order_from_won_lead"() TO "anon";
+GRANT ALL ON FUNCTION "public"."create_order_from_won_lead"() TO "authenticated";
+GRANT ALL ON FUNCTION "public"."create_order_from_won_lead"() TO "service_role";
 
 
 
