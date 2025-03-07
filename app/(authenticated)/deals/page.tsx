@@ -18,11 +18,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Search, Filter } from "lucide-react";
+import { PlusCircle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { redirect } from "next/navigation";
+import { FilterDealsDialog } from "@/components/deals/filter-dialog";
 
-export default async function DealsPage() {
+export default async function DealsPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
   const supabase = await createServerClient();
 
   // Get current user
@@ -42,8 +47,30 @@ export default async function DealsPage() {
     redirect("/dashboard");
   }
 
-  // Fetch deals based on role
-  const { success, data: deals, error } = await getDeals(user.id, userRole);
+  // Extract filters from search params
+  const salesPersonFilter =
+    userRole === "admin" &&
+    typeof searchParams.salesPersonId === "string" &&
+    searchParams.salesPersonId !== "all"
+      ? searchParams.salesPersonId
+      : undefined;
+
+  const monthFilter =
+    typeof searchParams.month === "string" && searchParams.month !== "all"
+      ? searchParams.month
+      : undefined;
+
+  const filters = {
+    salesPersonId: salesPersonFilter,
+    month: monthFilter,
+  };
+
+  // Fetch deals based on role and filters
+  const {
+    success,
+    data: deals,
+    error,
+  } = await getDeals(user.id, userRole, filters);
 
   if (!success) {
     return (
@@ -90,9 +117,7 @@ export default async function DealsPage() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input type="search" placeholder="Search deals..." className="pl-8" />
         </div>
-        <Button variant="outline" size="icon">
-          <Filter className="h-4 w-4" />
-        </Button>
+        <FilterDealsDialog isAdmin={userRole === "admin"} />
       </div>
 
       <Card>

@@ -18,10 +18,12 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FilterLeadsDialog } from "@/components/leads/filter-dialog";
+import { SearchLeads } from "@/components/leads/search-leads";
+import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 
 export default async function LeadsPage({
   searchParams,
@@ -45,12 +47,21 @@ export default async function LeadsPage({
   // Fetch leads based on role and filters
   let query = supabase.from("leads").select("*");
 
+  // Only admins can see won and lost leads
+  if (userRole !== "admin") {
+    query = query.not("status", "in", '("won","lost")');
+  }
+
   // Safely extract the sales person filter value
   const salesPersonFilter =
     typeof searchParams.salesPersonId === "string" &&
     searchParams.salesPersonId !== "all"
       ? searchParams.salesPersonId
       : null;
+
+  // Extract search query
+  const searchQuery =
+    typeof searchParams.search === "string" ? searchParams.search.trim() : "";
 
   // For sales_rep, only show leads assigned to them
   if (userRole === "sales_rep") {
@@ -118,7 +129,43 @@ export default async function LeadsPage({
     }
   }
 
+  // Apply search filter if search query exists
+  if (searchQuery) {
+    query = query.or(
+      `name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,phone_number.ilike.%${searchQuery}%,notes.ilike.%${searchQuery}%`
+    );
+  }
+
   const { data: leads } = await query;
+
+  // Fetch assigned users for each lead
+  const leadsWithAssignments = await Promise.all(
+    (leads || []).map(async (lead: Lead) => {
+      const { data } = await supabase
+        .from("lead_assignments")
+        .select("user_id")
+        .eq("lead_id", lead.id)
+        .single();
+
+      return {
+        ...lead,
+        assignedToUserId: data?.user_id || null,
+      };
+    })
+  );
+
+  // Sort leads by status (new → quote_made → negotiation → won → lost)
+  const sortOrder = {
+    new: 1,
+    quote_made: 2,
+    negotiation: 3,
+    won: 4,
+    lost: 5,
+  };
+
+  leadsWithAssignments.sort((a, b) => {
+    return sortOrder[a.status] - sortOrder[b.status];
+  });
 
   // Function to get badge color based on lead status
   const getStatusBadgeColor = (status: string) => {
@@ -149,10 +196,7 @@ export default async function LeadsPage({
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input type="search" placeholder="Search leads..." className="pl-8" />
-        </div>
+        <SearchLeads defaultValue={searchQuery} />
       </div>
 
       <Card>
@@ -167,11 +211,12 @@ export default async function LeadsPage({
                 <TableHead>Status</TableHead>
                 <TableHead>Quote Value</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead className="w-[70px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {leads && leads.length > 0 ? (
-                leads.map((lead: Lead) => (
+              {leadsWithAssignments && leadsWithAssignments.length > 0 ? (
+                leadsWithAssignments.map((lead) => (
                   <TableRow key={lead.id}>
                     <TableCell className="font-medium">{lead.name}</TableCell>
                     <TableCell>{lead.address}</TableCell>
@@ -195,12 +240,20 @@ export default async function LeadsPage({
                         ? new Date(lead.lead_created_date).toLocaleDateString()
                         : "N/A"}
                     </TableCell>
+                    <TableCell>
+                      <EditLeadDialog
+                        lead={lead}
+                        assignedToUserId={lead.assignedToUserId || ""}
+                        currentUserRole={userRole}
+                        currentUserId={user.id}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
                   <TableCell
-                    colSpan={7}
+                    colSpan={8}
                     className="text-center py-6 text-muted-foreground"
                   >
                     No leads found

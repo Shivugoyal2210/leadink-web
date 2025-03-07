@@ -128,9 +128,13 @@ export async function updateDeal({
 }
 
 /**
- * Get all deals based on user role and ID
+ * Get all deals based on user role and ID, with optional filters
  */
-export async function getDeals(userId: string, userRole: UserRole) {
+export async function getDeals(
+  userId: string,
+  userRole: UserRole,
+  filters?: { salesPersonId?: string; month?: string }
+) {
   try {
     const supabase = await createClient();
 
@@ -149,11 +153,33 @@ export async function getDeals(userId: string, userRole: UserRole) {
       // Sales managers can see all deals
       // No additional filtering needed
     } else if (userRole === "admin") {
-      // Admins can see all deals
-      // No additional filtering needed
+      // Admins can see all deals and can filter by sales rep
+      if (filters?.salesPersonId) {
+        query = query.eq("sales_rep_id", filters.salesPersonId);
+      }
     } else {
       // Other roles have limited or no access to deals
       return { success: false, error: "Insufficient permissions" };
+    }
+
+    // Apply month filter if provided
+    if (filters?.month) {
+      const [year, month] = filters.month
+        .split("-")
+        .map((num) => parseInt(num));
+
+      // Calculate start and end dates for the month
+      const startDate = new Date(year, month - 1, 1);
+      const endDate = new Date(year, month, 0); // Last day of the month
+
+      // Format dates for Postgres
+      const startDateStr = startDate.toISOString().split("T")[0];
+      const endDateStr = endDate.toISOString().split("T")[0];
+
+      // Filter orders by date range
+      query = query
+        .gte("order_date", startDateStr)
+        .lte("order_date", endDateStr);
     }
 
     const { data, error } = await query;

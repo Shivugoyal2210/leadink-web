@@ -228,3 +228,137 @@ export const getLeadAssignmentsAction = async (salesPersonId: string) => {
 
   return data || [];
 };
+
+export const updateLeadAction = async (
+  formData: FormData,
+  userId: string,
+  userRole: string
+) => {
+  const supabase = await createClient();
+
+  // Extract lead data from form
+  const leadId = formData.get("leadId") as string;
+  const name = formData.get("name") as string;
+  const address = formData.get("address") as string;
+  const propertyType = formData.get("propertyType") as string;
+  const company = formData.get("company") as string;
+  const architectName = formData.get("architectName") as string;
+  const phoneNumber = formData.get("phoneNumber") as string;
+  const leadFoundThrough = formData.get("leadFoundThrough") as string;
+  const notes = formData.get("notes") as string;
+  const assignedToUserId = formData.get("assignedToUserId") as string;
+  let status = formData.get("status") as string;
+  const currentStatus = formData.get("currentStatus") as string;
+  const quoteValueStr = formData.get("quoteValue") as string;
+
+  // Parse quote value (default to 0 if empty)
+  const quoteValue = quoteValueStr ? parseFloat(quoteValueStr) : 0;
+
+  if (
+    !leadId ||
+    !name ||
+    !address ||
+    !propertyType ||
+    !phoneNumber ||
+    !leadFoundThrough ||
+    !assignedToUserId ||
+    !status
+  ) {
+    return { error: "Missing required fields" };
+  }
+
+  // Only allow admin users to set status to won or lost
+  if (
+    userRole !== "admin" &&
+    (status === "won" || status === "lost") &&
+    currentStatus !== status
+  ) {
+    return { error: "Only administrators can mark leads as won or lost" };
+  }
+
+  // Prepare update data
+  const updateData = {
+    name,
+    address,
+    property_type: propertyType,
+    company: company || null,
+    architect_name: architectName || null,
+    phone_number: phoneNumber,
+    lead_found_through: leadFoundThrough,
+    status,
+    notes,
+    quote_value: quoteValue,
+  };
+
+  console.log("Updating lead with data:", { leadId, ...updateData });
+
+  // Update lead
+  const { error: leadError } = await supabase
+    .from("leads")
+    .update(updateData)
+    .eq("id", leadId);
+
+  if (leadError) {
+    console.error("Error updating lead:", leadError);
+    return { error: leadError.message };
+  }
+
+  // Check if assignment has changed
+  const { data: currentAssignment } = await supabase
+    .from("lead_assignments")
+    .select("user_id")
+    .eq("lead_id", leadId)
+    .single();
+
+  // Only allow admins and lead_assigners to change assignments
+  if (
+    currentAssignment &&
+    currentAssignment.user_id !== assignedToUserId &&
+    userRole !== "admin" &&
+    userRole !== "lead_assigner"
+  ) {
+    return {
+      error:
+        "Only administrators and lead assigners can change lead assignments",
+      leadId,
+    };
+  }
+
+  // If assignment changed, update it
+  if (currentAssignment && currentAssignment.user_id !== assignedToUserId) {
+    // Delete current assignment
+    await supabase.from("lead_assignments").delete().eq("lead_id", leadId);
+
+    // Create new assignment
+    const { error: assignmentError } = await supabase
+      .from("lead_assignments")
+      .insert({
+        lead_id: leadId,
+        user_id: assignedToUserId,
+      });
+
+    if (assignmentError) {
+      console.error("Error updating lead assignment:", assignmentError);
+      return { error: assignmentError.message };
+    }
+  }
+
+  return { success: true, leadId };
+};
+
+export const getLeadAssignedUserAction = async (leadId: string) => {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("lead_assignments")
+    .select("user_id")
+    .eq("lead_id", leadId)
+    .single();
+
+  if (error) {
+    console.error("Error fetching lead assignment:", error);
+    return null;
+  }
+
+  return data.user_id;
+};
