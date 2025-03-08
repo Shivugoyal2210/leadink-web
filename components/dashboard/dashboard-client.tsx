@@ -248,7 +248,9 @@ export function DashboardClient({
           </CardContent>
         </Card>
 
-        {["admin", "sales_manager", "sales_rep"].includes(userRole) && (
+        {["admin", "sales_manager", "sales_rep", "viewer"].includes(
+          userRole
+        ) && (
           <>
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

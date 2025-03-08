@@ -38,35 +38,47 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
   const [open, setOpen] = useState(false);
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [selectedSalesPerson, setSelectedSalesPerson] = useState<string>("all");
+  const [selectedYear, setSelectedYear] = useState<string>("all");
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
   const activeUserFilter = searchParams.get("salesPersonId");
+  const activeYearFilter = searchParams.get("year");
   const activeMonthFilter = searchParams.get("month");
+
+  // Generate year options - current year and previous 5 years
+  const getYearOptions = () => {
+    const years = [];
+    const currentYear = new Date().getFullYear();
+
+    for (let i = 0; i <= 5; i++) {
+      const year = currentYear - i;
+      years.push({ value: year.toString(), label: year.toString() });
+    }
+
+    return years;
+  };
 
   // Generate month options
   const getMonthOptions = () => {
     const months = [];
-    const currentDate = new Date();
-    // Get last 12 months
-    for (let i = 0; i < 12; i++) {
-      const monthDate = new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth() - i,
-        1
-      );
-      const monthString = monthDate.toLocaleDateString("en-US", {
-        month: "long",
-        year: "numeric",
-      });
-      const monthValue = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, "0")}`;
-      months.push({ value: monthValue, label: monthString });
+
+    for (let i = 1; i <= 12; i++) {
+      const monthNum = i;
+      const monthStr = String(monthNum).padStart(2, "0");
+      const date = new Date(2000, i - 1, 1);
+      const monthName = date.toLocaleString("default", { month: "long" });
+
+      months.push({ value: monthStr, label: monthName });
     }
+
     return months;
   };
 
+  const yearOptions = getYearOptions();
   const monthOptions = getMonthOptions();
 
   useEffect(() => {
@@ -86,12 +98,18 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
       setSelectedSalesPerson("all");
     }
 
+    if (activeYearFilter && activeYearFilter !== "all") {
+      setSelectedYear(activeYearFilter);
+    } else {
+      setSelectedYear("all");
+    }
+
     if (activeMonthFilter && activeMonthFilter !== "all") {
       setSelectedMonth(activeMonthFilter);
     } else {
       setSelectedMonth("all");
     }
-  }, [open, activeUserFilter, activeMonthFilter, isAdmin]);
+  }, [open, activeUserFilter, activeYearFilter, activeMonthFilter, isAdmin]);
 
   const handleApplyFilter = () => {
     setIsLoading(true);
@@ -106,6 +124,13 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
       } else {
         params.delete("salesPersonId");
       }
+    }
+
+    // Update year filter
+    if (selectedYear && selectedYear !== "all") {
+      params.set("year", selectedYear);
+    } else {
+      params.delete("year");
     }
 
     // Update month filter
@@ -123,6 +148,7 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
 
   const handleClearFilter = () => {
     setSelectedSalesPerson("all");
+    setSelectedYear("all");
     setSelectedMonth("all");
 
     const params = new URLSearchParams();
@@ -134,6 +160,11 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
     if (!activeUserFilter || activeUserFilter === "all") return null;
     const user = salesUsers.find((user) => user.id === activeUserFilter);
     return user ? user.full_name : null;
+  };
+
+  const getSelectedYearName = () => {
+    if (!activeYearFilter || activeYearFilter === "all") return null;
+    return activeYearFilter;
   };
 
   const getSelectedMonthName = () => {
@@ -165,25 +196,41 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
           </Badge>
         )}
 
-      {activeMonthFilter &&
-        activeMonthFilter !== "all" &&
-        getSelectedMonthName() && (
-          <Badge variant="outline" className="flex gap-1 items-center">
-            <span>Month: {getSelectedMonthName()}</span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-4 w-4 ml-1 rounded-full"
-              onClick={() => {
-                const params = new URLSearchParams(searchParams.toString());
-                params.delete("month");
-                router.push(`${pathname}?${params.toString()}`);
-              }}
-            >
-              ×
-            </Button>
-          </Badge>
-        )}
+      {activeYearFilter && activeYearFilter !== "all" && (
+        <Badge variant="outline" className="flex gap-1 items-center">
+          <span>Year: {getSelectedYearName()}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-4 w-4 ml-1 rounded-full"
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("year");
+              router.push(`${pathname}?${params.toString()}`);
+            }}
+          >
+            ×
+          </Button>
+        </Badge>
+      )}
+
+      {activeMonthFilter && activeMonthFilter !== "all" && (
+        <Badge variant="outline" className="flex gap-1 items-center">
+          <span>Month: {getSelectedMonthName()}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-4 w-4 ml-1 rounded-full"
+            onClick={() => {
+              const params = new URLSearchParams(searchParams.toString());
+              params.delete("month");
+              router.push(`${pathname}?${params.toString()}`);
+            }}
+          >
+            ×
+          </Button>
+        </Badge>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger asChild>
@@ -225,6 +272,23 @@ export function FilterDealsDialog({ isAdmin }: FilterDealsDialogProps) {
                     </Select>
                   </div>
                 )}
+
+                <div className="space-y-2">
+                  <Label htmlFor="year">Year</Label>
+                  <Select value={selectedYear} onValueChange={setSelectedYear}>
+                    <SelectTrigger id="year">
+                      <SelectValue placeholder="Select year" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Years</SelectItem>
+                      {yearOptions.map((year) => (
+                        <SelectItem key={year.value} value={year.value}>
+                          {year.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="month">Month</Label>

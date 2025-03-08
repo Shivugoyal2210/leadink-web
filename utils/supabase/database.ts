@@ -133,7 +133,7 @@ export async function updateDeal({
 export async function getDeals(
   userId: string,
   userRole: UserRole,
-  filters?: { salesPersonId?: string; month?: string }
+  filters?: { salesPersonId?: string; year?: string; month?: string }
 ) {
   try {
     const supabase = await createClient();
@@ -157,29 +157,53 @@ export async function getDeals(
       if (filters?.salesPersonId) {
         query = query.eq("sales_rep_id", filters.salesPersonId);
       }
+    } else if (userRole === "viewer") {
+      // Viewers can see all deals (read-only access)
+      // No additional filtering needed
     } else {
       // Other roles have limited or no access to deals
       return { success: false, error: "Insufficient permissions" };
     }
 
-    // Apply month filter if provided
-    if (filters?.month) {
-      const [year, month] = filters.month
-        .split("-")
-        .map((num) => parseInt(num));
+    // Apply date filters if provided
+    if (filters?.year || filters?.month) {
+      // If both year and month are provided, filter by specific month in that year
+      if (
+        filters?.year &&
+        filters?.year !== "all" &&
+        filters?.month &&
+        filters?.month !== "all"
+      ) {
+        const year = filters.year;
+        const monthNum = filters.month;
 
-      // Calculate start and end dates for the month
-      const startDate = new Date(year, month - 1, 1);
-      const endDate = new Date(year, month, 0); // Last day of the month
+        // Calculate start and end dates for the specific month and year
+        const startDate = `${year}-${monthNum}-01`;
 
-      // Format dates for Postgres
-      const startDateStr = startDate.toISOString().split("T")[0];
-      const endDateStr = endDate.toISOString().split("T")[0];
+        // Calculate the last day of the month
+        const endDay = new Date(Number(year), Number(monthNum), 0).getDate();
+        const endDate = `${year}-${monthNum}-${endDay}`;
 
-      // Filter orders by date range
-      query = query
-        .gte("order_date", startDateStr)
-        .lte("order_date", endDateStr);
+        // Filter orders by date range
+        query = query.gte("order_date", startDate).lte("order_date", endDate);
+      }
+      // If only year is provided, filter by entire year
+      else if (filters?.year && filters?.year !== "all") {
+        const year = filters.year;
+
+        // Filter for the entire year
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
+
+        query = query.gte("order_date", startDate).lte("order_date", endDate);
+      }
+      // If only month is provided, filter by that month across all years
+      else if (filters?.month && filters?.month !== "all") {
+        const monthNum = filters.month;
+
+        // Filter by month pattern across all years
+        query = query.ilike("order_date", `%-${monthNum}-%`);
+      }
     }
 
     const { data, error } = await query;

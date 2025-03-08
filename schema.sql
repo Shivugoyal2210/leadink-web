@@ -443,7 +443,7 @@ CREATE POLICY "Users can update their own settings except role." ON "public"."us
 
 CREATE POLICY "Users can view their own quote requests" ON "public"."quote_requests" FOR SELECT USING ((("auth"."uid"() = "sales_rep_id") OR ("auth"."uid"() = "quote_maker_id") OR (( SELECT "users"."role"
    FROM "public"."users"
-  WHERE ("users"."id" = "auth"."uid"())) = 'admin'::"public"."user_role")));
+  WHERE ("users"."id" = "auth"."uid"())) IN ('admin', 'viewer'))));
 
 
 
@@ -472,7 +472,7 @@ ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "users_can_see_their_own_orders_or_admin_can_see_all" ON "public"."orders" FOR SELECT TO "authenticated" USING ((("auth"."uid"() IN ( SELECT "users"."id"
    FROM "public"."users"
-  WHERE ("users"."role" = 'admin'::"public"."user_role"))) OR ("sales_rep_id" = "auth"."uid"())));
+  WHERE ("users"."role" = 'admin'::"public"."user_role" OR "users"."role" = 'viewer'::"public"."user_role")))) OR ("sales_rep_id" = "auth"."uid"()));
 
 
 

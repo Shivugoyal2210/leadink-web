@@ -54,7 +54,7 @@ export default async function LeadsPage({
   let query = supabase.from("leads").select("*");
 
   // Only admins can see won and lost leads
-  if (userRole !== "admin") {
+  if (userRole !== "admin" && userRole !== "viewer") {
     query = query.not("status", "in", '("won","lost")');
   }
 

@@ -48,7 +48,11 @@ export default async function QuoteRequestsPage({
   const userRole = (await getUserRole(user.id)) as UserRole;
 
   // Only allow access to quote makers and admins
-  if (userRole !== "quote_maker" && userRole !== "admin") {
+  if (
+    userRole !== "quote_maker" &&
+    userRole !== "admin" &&
+    userRole !== "viewer"
+  ) {
     redirect("/dashboard");
   }
 

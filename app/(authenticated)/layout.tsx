@@ -29,7 +29,7 @@ export default async function AuthenticatedLayout({
 
   if (!userRole) {
     // If no role is found, redirect to sign-in
-    redirect("/sing-in");
+    redirect("/sign-in");
   }
 
   return (

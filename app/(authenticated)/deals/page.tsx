@@ -51,7 +51,7 @@ export default async function DealsPage({
   const userRole = (await getUserRole(user.id)) as UserRole;
 
   // Check if user has access to deals page
-  if (!["admin", "sales_manager", "sales_rep"].includes(userRole)) {
+  if (!["admin", "sales_manager", "sales_rep", "viewer"].includes(userRole)) {
     redirect("/dashboard");
   }
 
@@ -77,6 +77,11 @@ export default async function DealsPage({
       ? params.salesPersonId
       : undefined;
 
+  const yearFilter =
+    typeof params.year === "string" && params.year !== "all"
+      ? params.year
+      : undefined;
+
   const monthFilter =
     typeof params.month === "string" && params.month !== "all"
       ? params.month
@@ -84,6 +89,7 @@ export default async function DealsPage({
 
   const filters = {
     salesPersonId: salesPersonFilter,
+    year: yearFilter,
     month: monthFilter,
   };
 

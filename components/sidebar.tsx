@@ -34,6 +34,7 @@ export function Sidebar({ userRole }: SidebarProps) {
         "sales_rep",
         "lead_assigner",
         "quote_maker",
+        "viewer",
       ],
     },
     {
@@ -46,19 +47,20 @@ export function Sidebar({ userRole }: SidebarProps) {
         "sales_rep",
         "lead_assigner",
         "quote_maker",
+        "viewer",
       ],
     },
     {
       name: "Deals",
       href: "/deals",
       icon: ShoppingBag,
-      roles: ["admin", "sales_manager", "sales_rep"],
+      roles: ["admin", "sales_manager", "sales_rep", "viewer"],
     },
     {
       name: "Quote Requests",
       href: "/quote-requests",
       icon: FileSpreadsheet,
-      roles: ["quote_maker", "admin"],
+      roles: ["quote_maker", "admin", "viewer"],
     },
   ];
 

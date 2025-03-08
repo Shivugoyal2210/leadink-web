@@ -6,7 +6,8 @@ export type UserRole =
   | "sales_manager"
   | "sales_rep"
   | "lead_assigner"
-  | "quote_maker";
+  | "quote_maker"
+  | "viewer";
 
 /**
  * Lead status enum type from the database

@@ -32,7 +32,7 @@ export default async function DashboardPage() {
   totalLeads = leadsCount || 0;
 
   // Get deals data if user has access
-  if (["admin", "sales_manager", "sales_rep"].includes(userRole)) {
+  if (["admin", "sales_manager", "sales_rep", "viewer"].includes(userRole)) {
     // For sales_rep, only count their deals
     let query = supabase.from("orders").select("*", { count: "exact" });
 

@@ -49,6 +49,7 @@ const formSchema = z.object({
   notes: z.string().optional(),
   amountReceived: z.coerce.number().min(0, "Amount received must be positive"),
   finalSizeDate: z.string().optional(),
+  orderDate: z.string().optional(),
 });
 
 interface EditDealDialogProps {
@@ -78,6 +79,9 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
       amountReceived: deal.amount_recieved || 0,
       finalSizeDate: deal.final_size_date
         ? new Date(deal.final_size_date).toISOString().split("T")[0]
+        : undefined,
+      orderDate: deal.order_date
+        ? new Date(deal.order_date).toISOString().split("T")[0]
         : undefined,
     },
   });
@@ -278,6 +282,27 @@ export function EditDealDialog({ deal }: EditDealDialogProps) {
                       )}
                     />
 
+                    <FormField
+                      control={form.control}
+                      name="orderDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Deal Date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              placeholder="Select date"
+                              {...field}
+                              value={field.value || ""}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="finalSizeDate"
