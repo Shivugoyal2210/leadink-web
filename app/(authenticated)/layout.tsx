@@ -21,15 +21,15 @@ export default async function AuthenticatedLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/sign-in");
   }
 
   // Get user role
   const userRole = (await getUserRole(user.id)) as UserRole;
 
   if (!userRole) {
-    // If no role is found, redirect to login
-    redirect("/login");
+    // If no role is found, redirect to sign-in
+    redirect("/sing-in");
   }
 
   return (

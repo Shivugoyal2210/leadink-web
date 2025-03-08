@@ -181,7 +181,7 @@ export default async function QuoteRequestsPage({
               <TableRow>
                 <TableHead>Lead</TableHead>
                 <TableHead>Address</TableHead>
-                <TableHead>Property Type</TableHead>
+                <TableHead>Type</TableHead>
                 <TableHead>Sales Rep</TableHead>
                 <TableHead>Requested At</TableHead>
                 <TableHead>Status</TableHead>
@@ -198,7 +198,7 @@ export default async function QuoteRequestsPage({
                     </TableCell>
                     <TableCell>{request.leads.address}</TableCell>
                     <TableCell className="capitalize">
-                      {request.leads.property_type}
+                      {request.type || request.leads.property_type}
                     </TableCell>
                     <TableCell>
                       {request.users ? request.users.full_name : "N/A"}

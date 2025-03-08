@@ -14,6 +14,6 @@ export default async function HomePage() {
     redirect("/dashboard");
   }
 
-  // Otherwise, redirect to login
-  redirect("/login");
+  // Otherwise, redirect to sing-in
+  redirect("/sign-in");
 }
