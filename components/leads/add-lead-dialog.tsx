@@ -55,7 +55,14 @@ const formSchema = z
     company: z.string().optional(),
     architectName: z.string().optional(),
     phoneNumber: z.string().min(1, "Phone number is required"),
-    leadFoundThrough: z.enum(["scanner", "ads", "social_media", "organic"]),
+    leadFoundThrough: z.enum([
+      "scanner",
+      "sunny",
+      "social_media",
+      "word_of_mouth",
+      "social_media_ads",
+      "architect",
+    ]),
     notes: z.string().optional(),
     isUnqualified: z.boolean().default(false),
     assignedToUserId: z.string().optional(),
@@ -97,7 +104,7 @@ export function AddLeadDialog() {
       company: "",
       architectName: "",
       phoneNumber: "",
-      leadFoundThrough: "organic",
+      leadFoundThrough: "scanner",
       notes: "",
       isUnqualified: false,
       assignedToUserId: "",
@@ -301,16 +308,22 @@ export function AddLeadDialog() {
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select lead source" />
+                              <SelectValue placeholder="How was the lead found?" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
                             <SelectItem value="scanner">Scanner</SelectItem>
-                            <SelectItem value="ads">Ads</SelectItem>
+                            <SelectItem value="sunny">Sunny</SelectItem>
                             <SelectItem value="social_media">
                               Social Media
                             </SelectItem>
-                            <SelectItem value="organic">Organic</SelectItem>
+                            <SelectItem value="word_of_mouth">
+                              Word of Mouth
+                            </SelectItem>
+                            <SelectItem value="social_media_ads">
+                              Social Media Ads
+                            </SelectItem>
+                            <SelectItem value="architect">Architect</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

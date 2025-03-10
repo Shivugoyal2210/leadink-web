@@ -67,6 +67,9 @@ export interface Lead {
   notes?: string;
   lead_created_date: string;
   lead_found_through: LeadFoundThrough;
+  // Runtime properties added by server actions
+  assignedToUserId?: string;
+  assignedToUserName?: string;
 }
 
 /**

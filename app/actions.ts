@@ -483,9 +483,19 @@ export const completeQuoteRequestAction = async (formData: FormData) => {
 
 export const startWorkingOnQuoteRequestAction = async (formData: FormData) => {
   const quoteRequestId = formData.get("quoteRequestId") as string;
+  const leadId = formData.get("leadId") as string;
+  const quoteNumber = formData.get("quoteNumber") as string;
 
   if (!quoteRequestId) {
     return { error: "Quote request ID is required" };
+  }
+
+  if (!leadId) {
+    return { error: "Lead ID is required" };
+  }
+
+  if (!quoteNumber) {
+    return { error: "Quote number is required" };
   }
 
   const supabase = await createClient();
@@ -499,8 +509,9 @@ export const startWorkingOnQuoteRequestAction = async (formData: FormData) => {
     return { error: "User not authenticated" };
   }
 
-  // Update the quote request
-  const { error } = await supabase
+  // Start a Supabase transaction
+  // Update the quote request status to active
+  const { error: quoteRequestError } = await supabase
     .from("quote_requests")
     .update({
       status: "active",
@@ -508,9 +519,226 @@ export const startWorkingOnQuoteRequestAction = async (formData: FormData) => {
     })
     .eq("id", quoteRequestId);
 
-  if (error) {
-    return { error: error.message };
+  if (quoteRequestError) {
+    return { error: quoteRequestError.message };
+  }
+
+  // Update the lead's quote number
+  const { error: leadError } = await supabase
+    .from("leads")
+    .update({
+      quote_number: quoteNumber,
+      status: "quote_made", // Update lead status to quote_made
+    })
+    .eq("id", leadId);
+
+  if (leadError) {
+    // If lead update fails, try to revert quote request change
+    await supabase
+      .from("quote_requests")
+      .update({
+        status: "pending",
+        quote_maker_id: null,
+      })
+      .eq("id", quoteRequestId);
+
+    return { error: leadError.message };
   }
 
   return { success: true };
 };
+
+export async function getMoreLeadsAction(
+  page: number,
+  filters: {
+    salesPersonId?: string;
+    status?: string;
+    search?: string;
+  }
+) {
+  "use server";
+
+  const supabase = await createClient();
+  const pageSize = 25;
+
+  // Start with basic query
+  let query = supabase.from("leads").select("*");
+
+  // Apply sales person filter
+  if (filters.salesPersonId && filters.salesPersonId !== "all") {
+    const { data: assignedLeads } = await supabase
+      .from("lead_assignments")
+      .select("lead_id")
+      .eq("user_id", filters.salesPersonId);
+
+    if (assignedLeads && assignedLeads.length > 0) {
+      const leadIds = assignedLeads.map((assignment) => assignment.lead_id);
+      query = query.in("id", leadIds);
+    }
+  }
+
+  // Apply status filter
+  if (filters.status && filters.status !== "all") {
+    query = query.eq("status", filters.status);
+  }
+
+  // Apply search filter
+  if (filters.search) {
+    query = query.or(
+      `name.ilike.%${filters.search}%,address.ilike.%${filters.search}%,phone_number.ilike.%${filters.search}%,notes.ilike.%${filters.search}%`
+    );
+  }
+
+  // Apply pagination
+  const { data: leads, error: leadsError } = await query
+    .range((page - 1) * pageSize, page * pageSize - 1)
+    .order("status", { ascending: true })
+    .order("lead_created_date", { ascending: false });
+
+  if (leadsError || !leads || leads.length === 0) {
+    console.error("Error fetching leads:", leadsError);
+    return [];
+  }
+
+  // Get all lead IDs to fetch their assignments in a single query
+  const leadIds = leads.map((lead) => lead.id);
+
+  // Fetch all assignments for these leads in a single query
+  const { data: assignments, error: assignmentsError } = await supabase
+    .from("lead_assignments")
+    .select("lead_id, user_id")
+    .in("lead_id", leadIds);
+
+  if (assignmentsError) {
+    console.error("Error fetching lead assignments:", assignmentsError);
+    // Continue with the leads even if we can't get assignments
+  }
+
+  // Create a map of lead_id to user_id for quick lookup
+  const assignmentMap = new Map();
+  if (assignments && assignments.length > 0) {
+    assignments.forEach((assignment) => {
+      assignmentMap.set(assignment.lead_id, assignment.user_id);
+    });
+  }
+
+  // If we're filtering by a specific sales person, all leads should have that person assigned
+  if (filters.salesPersonId && filters.salesPersonId !== "all") {
+    // Pre-assign the filtered user to all leads
+    const userIds = new Set([filters.salesPersonId]);
+
+    // Fetch the user details for just this user
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", Array.from(userIds));
+
+    if (usersError) {
+      console.error("Error fetching users:", usersError);
+      // Continue even if we can't get user details
+    }
+
+    // Create a map of user_id to full_name
+    const userMap = new Map();
+    if (users && users.length > 0) {
+      users.forEach((user) => {
+        userMap.set(user.id, user.full_name);
+      });
+    }
+
+    // Map the leads with their assignments
+    return leads.map((lead) => {
+      const userId = assignmentMap.get(lead.id) || filters.salesPersonId;
+      return {
+        ...lead,
+        assignedToUserId: userId,
+        assignedToUserName: userMap.get(userId) || "Deepak", // Use the known name when filtering by specific user
+      };
+    });
+  }
+  // Normal case - get all user IDs from assignments
+  else {
+    // Collect unique user IDs from assignments
+    const userIds = new Set();
+    assignmentMap.forEach((userId) => {
+      if (userId) userIds.add(userId);
+    });
+
+    // Fetch all required users in a single query
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", Array.from(userIds));
+
+    if (usersError) {
+      console.error("Error fetching users:", usersError);
+      // Continue even if we can't get user details
+    }
+
+    // Create a map of user_id to full_name
+    const userMap = new Map();
+    if (users && users.length > 0) {
+      users.forEach((user) => {
+        userMap.set(user.id, user.full_name);
+      });
+    }
+
+    // Map the leads with their assignments
+    return leads.map((lead) => {
+      const userId = assignmentMap.get(lead.id);
+      return {
+        ...lead,
+        assignedToUserId: userId || null,
+        assignedToUserName: userId
+          ? userMap.get(userId) || "Unknown"
+          : "Unassigned",
+      };
+    });
+  }
+}
+
+export async function submitQuoteRequestAction(formData: FormData) {
+  "use server";
+
+  const leadId = formData.get("leadId") as string;
+
+  if (!leadId) {
+    return { error: "Lead ID is required" };
+  }
+
+  const supabase = await createClient();
+
+  // Get the assigned sales rep ID for this lead
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("lead_assignments")
+    .select("user_id")
+    .eq("lead_id", leadId)
+    .single();
+
+  if (assignmentError) {
+    console.error("Error finding sales rep assignment:", assignmentError);
+    return { error: "Could not find sales rep for this lead" };
+  }
+
+  if (!assignment) {
+    return { error: "This lead has no assigned sales rep" };
+  }
+
+  const salesRepId = assignment.user_id;
+
+  // Create the quote request
+  const { error: createError } = await supabase.from("quote_requests").insert({
+    lead_id: leadId,
+    sales_rep_id: salesRepId,
+    status: "pending",
+    quote_value: 0,
+    type: "fresh",
+  });
+
+  if (createError) {
+    console.error("Error creating quote request:", createError);
+    return { error: createError.message };
+  }
+
+  return { success: true };
+}

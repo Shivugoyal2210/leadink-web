@@ -27,6 +27,7 @@ import { SearchLeads } from "@/components/leads/search-leads";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { CurrencyCell } from "@/components/tables/currency-cell";
 import { LeadsSkeleton } from "@/components/leads/leads-skeleton";
+import { LeadsTable } from "@/components/leads/leads-table";
 
 export default function LeadsPage({
   searchParams,
@@ -74,12 +75,18 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
   // Get user role
   const userRole = (await getUserRole(user.id)) as UserRole;
 
-  // Fetch leads based on role and filters
-  let query = supabase.from("leads").select("*");
+  // Get the page number from URL or default to 1
+  const page = typeof params.page === "string" ? parseInt(params.page, 10) : 1;
+  const pageSize = 25;
+
+  // Build the base query for counting total leads
+  let countQuery = supabase.from("leads").select("*", { count: "exact" });
+  let dataQuery = supabase.from("leads").select("*");
 
   // Only admins can see won and lost leads
   if (userRole !== "admin" && userRole !== "viewer") {
-    query = query.not("status", "in", '("won","lost")');
+    countQuery = countQuery.not("status", "in", '("won","lost")');
+    dataQuery = dataQuery.not("status", "in", '("won","lost")');
   }
 
   // Safely extract the sales person filter value
@@ -107,7 +114,8 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
 
     if (assignedLeads && assignedLeads.length > 0) {
       const leadIds = assignedLeads.map((assignment) => assignment.lead_id);
-      query = query.in("id", leadIds);
+      countQuery = countQuery.in("id", leadIds);
+      dataQuery = dataQuery.in("id", leadIds);
     } else {
       // If no leads are assigned, return empty array
       return (
@@ -130,7 +138,8 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
 
     if (assignedLeads && assignedLeads.length > 0) {
       const leadIds = assignedLeads.map((assignment) => assignment.lead_id);
-      query = query.in("id", leadIds);
+      countQuery = countQuery.in("id", leadIds);
+      dataQuery = dataQuery.in("id", leadIds);
     } else {
       // If no leads are assigned to the filtered sales person
       return (
@@ -148,70 +157,29 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
 
   // Apply status filter if it exists
   if (statusFilter) {
-    query = query.eq("status", statusFilter);
+    countQuery = countQuery.eq("status", statusFilter);
+    dataQuery = dataQuery.eq("status", statusFilter);
   }
 
   // Apply search filter if search query exists
   if (searchQuery) {
-    query = query.or(
-      `name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,phone_number.ilike.%${searchQuery}%,notes.ilike.%${searchQuery}%`
-    );
+    const searchFilter = `name.ilike.%${searchQuery}%,address.ilike.%${searchQuery}%,phone_number.ilike.%${searchQuery}%,notes.ilike.%${searchQuery}%`;
+    countQuery = countQuery.or(searchFilter);
+    dataQuery = dataQuery.or(searchFilter);
   }
 
-  const { data: leads } = await query;
+  // Get total count for pagination
+  const { count } = await countQuery;
+  const totalPages = Math.ceil((count || 0) / pageSize);
 
-  // Fetch assigned users for each lead
-  const leadsWithAssignments = await Promise.all(
-    (leads || []).map(async (lead: Lead) => {
-      const { data } = await supabase
-        .from("lead_assignments")
-        .select("user_id")
-        .eq("lead_id", lead.id)
-        .single();
+  // Apply pagination to data query
+  const { data: leads } = await dataQuery
+    .range((page - 1) * pageSize, page * pageSize - 1)
+    .order("status", { ascending: true })
+    .order("lead_created_date", { ascending: false });
 
-      return {
-        ...lead,
-        assignedToUserId: data?.user_id || null,
-      };
-    })
-  );
-
-  // Sort leads by status (new → quote_made → negotiation → won → lost → unqualified)
-  const sortOrder = {
-    new: 1,
-    quote_made: 2,
-    negotiation: 3,
-    won: 4,
-    lost: 5,
-    unqualified: 6,
-  };
-
-  leadsWithAssignments.sort((a, b) => {
-    return sortOrder[a.status] - sortOrder[b.status];
-  });
-
-  // Function to get badge color based on lead status
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case "new":
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case "quote_made":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300";
-      case "negotiation":
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case "won":
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case "lost":
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      case "unqualified":
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
-    }
-  };
-
-  // If no leads found after applying filters
-  if (!leadsWithAssignments || leadsWithAssignments.length === 0) {
+  // If no leads found
+  if (!leads || leads.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -224,63 +192,140 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
     );
   }
 
-  return (
-    <Card>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead>Property Type</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Quote Value</TableHead>
-              <TableHead>Quote #</TableHead>
-              <TableHead>Created</TableHead>
-              <TableHead className="w-[70px]">
-                {!["quote_maker"].includes(userRole) ? "Actions" : ""}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {leadsWithAssignments.map((lead) => (
-              <TableRow key={lead.id}>
-                <TableCell className="font-medium">{lead.name}</TableCell>
-                <TableCell>{lead.address}</TableCell>
-                <TableCell className="capitalize">
-                  {lead.property_type}
-                </TableCell>
-                <TableCell>{lead.phone_number}</TableCell>
-                <TableCell>
-                  <Badge className={getStatusBadgeColor(lead.status)}>
-                    {lead.status.replace("_", " ")}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <CurrencyCell value={lead.quote_value || 0} />
-                </TableCell>
-                <TableCell>{lead.quote_number || "—"}</TableCell>
-                <TableCell>
-                  {lead.lead_created_date
-                    ? new Date(lead.lead_created_date).toLocaleDateString()
-                    : "N/A"}
-                </TableCell>
-                <TableCell>
-                  {!["quote_maker"].includes(userRole) ? (
-                    <EditLeadDialog
-                      lead={lead}
-                      assignedToUserId={lead.assignedToUserId}
-                      currentUserRole={userRole}
-                      currentUserId={user.id}
-                    />
-                  ) : null}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
+  // Get all lead IDs
+  const leadIds = leads.map((lead) => lead.id);
+
+  // Fetch all assignments for these leads in a single query
+  const { data: assignments } = await supabase
+    .from("lead_assignments")
+    .select("lead_id, user_id")
+    .in("lead_id", leadIds);
+
+  // Create a map of lead_id to user_id for quick lookup
+  const assignmentMap = new Map();
+  if (assignments && assignments.length > 0) {
+    assignments.forEach((assignment) => {
+      assignmentMap.set(assignment.lead_id, assignment.user_id);
+    });
+  }
+
+  // If we're filtering by a specific sales person
+  if (salesPersonFilter) {
+    // Pre-assign the filtered user to all leads
+    const userIds = new Set([salesPersonFilter]);
+
+    // Fetch the user details in a single query
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", Array.from(userIds));
+
+    // Create a map of user_id to full_name
+    const userMap = new Map();
+    if (users && users.length > 0) {
+      users.forEach((user) => {
+        userMap.set(user.id, user.full_name);
+      });
+    }
+
+    // Map the leads with their assignments and names
+    const leadsWithAssignments = leads.map((lead) => {
+      const userId = assignmentMap.get(lead.id) || salesPersonFilter;
+      return {
+        ...lead,
+        assignedToUserId: userId,
+        assignedToUserName: userMap.get(userId) || "Unknown",
+      };
+    });
+
+    // If no leads found after applying filters
+    if (leadsWithAssignments.length === 0) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Leads Found</CardTitle>
+            <CardDescription>
+              No leads found matching your criteria.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <LeadsTable
+            initialLeads={leadsWithAssignments}
+            userRole={userRole}
+            currentUserId={user.id}
+            hasMore={page < totalPages}
+            totalPages={totalPages}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+  // Normal case - not filtering by sales person
+  else {
+    // Collect unique user IDs from assignments
+    const userIds = new Set();
+    assignmentMap.forEach((userId) => {
+      if (userId) userIds.add(userId);
+    });
+
+    // Fetch all required users in a single query
+    const { data: users } = await supabase
+      .from("users")
+      .select("id, full_name")
+      .in("id", Array.from(userIds));
+
+    // Create a map of user_id to full_name
+    const userMap = new Map();
+    if (users && users.length > 0) {
+      users.forEach((user) => {
+        userMap.set(user.id, user.full_name);
+      });
+    }
+
+    // Map the leads with their assignments and names
+    const leadsWithAssignments = leads.map((lead) => {
+      const userId = assignmentMap.get(lead.id);
+      return {
+        ...lead,
+        assignedToUserId: userId || null,
+        assignedToUserName: userId
+          ? userMap.get(userId) || "Unknown"
+          : "Unassigned",
+      };
+    });
+
+    // If no leads found after applying filters
+    if (leadsWithAssignments.length === 0) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle>No Leads Found</CardTitle>
+            <CardDescription>
+              No leads found matching your criteria.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      );
+    }
+
+    return (
+      <Card>
+        <CardContent className="p-0">
+          <LeadsTable
+            initialLeads={leadsWithAssignments}
+            userRole={userRole}
+            currentUserId={user.id}
+            hasMore={page < totalPages}
+            totalPages={totalPages}
+          />
+        </CardContent>
+      </Card>
+    );
+  }
 }

@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createServerClient } from "@/utils/supabase";
 import { getUserRole } from "@/utils/supabase/database";
 import { QuoteRequest, UserRole } from "@/utils/supabase/types";
@@ -18,12 +19,35 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CompleteQuoteDialog } from "@/components/quote-requests/complete-quote-dialog";
-import { StartWorkingButton } from "@/components/quote-requests/start-working-button";
+import { StartWorkingDialog } from "@/components/quote-requests/start-working-dialog";
 import { SearchQuoteRequests } from "@/components/quote-requests/search-quote-requests";
+import { FilterQuoteRequestsDialog } from "@/components/quote-requests/filter-dialog";
 import { CurrencyCell } from "@/components/tables/currency-cell";
+import { QuoteRequestsSkeleton } from "@/components/quote-requests/quote-requests-skeleton";
 import { redirect } from "next/navigation";
 
-export default async function QuoteRequestsPage({
+export default function QuoteRequestsPage({
+  searchParams,
+}: {
+  searchParams: Promise<any>;
+}) {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">Quote Requests</h1>
+
+      <div className="flex items-center gap-2">
+        <SearchQuoteRequests />
+        <FilterQuoteRequestsDialog />
+      </div>
+
+      <Suspense fallback={<QuoteRequestsSkeleton />}>
+        <QuoteRequestsContent searchParams={searchParams} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function QuoteRequestsContent({
   searchParams,
 }: {
   searchParams: Promise<any>;
@@ -56,9 +80,30 @@ export default async function QuoteRequestsPage({
     redirect("/dashboard");
   }
 
-  // Extract search query
+  // Extract filters from search params
   const searchQuery =
     typeof params.search === "string" ? params.search.trim() : "";
+
+  // Extract filters
+  const salesPersonFilter =
+    typeof params.salesPersonId === "string" && params.salesPersonId !== "all"
+      ? params.salesPersonId
+      : undefined;
+
+  const quoteTypeFilter =
+    typeof params.quoteType === "string" && params.quoteType !== "all"
+      ? params.quoteType
+      : undefined;
+
+  const yearFilter =
+    typeof params.year === "string" && params.year !== "all"
+      ? params.year
+      : undefined;
+
+  const monthFilter =
+    typeof params.month === "string" && params.month !== "all"
+      ? params.month
+      : undefined;
 
   // Fetch quote requests
   let query = supabase.from("quote_requests").select(`
@@ -66,16 +111,57 @@ export default async function QuoteRequestsPage({
       leads!inner (
         name,
         address,
-        property_type
+        property_type,
+        quote_number
       ),
       users!quote_requests_sales_rep_id_fkey (
         full_name
       )
     `);
 
-  // If quote maker, only show assigned or unassigned quote requests
-  if (userRole === "quote_maker") {
-    query = query.or(`quote_maker_id.is.null,quote_maker_id.eq.${user.id}`);
+  // Apply sales person filter
+  if (salesPersonFilter) {
+    query = query.eq("sales_rep_id", salesPersonFilter);
+  }
+
+  // Apply quote type filter
+  if (quoteTypeFilter) {
+    query = query.eq("type", quoteTypeFilter);
+  }
+
+  // Apply date filters for the quoted_at field
+  if (yearFilter) {
+    const startDate = new Date(`${yearFilter}-01-01`);
+
+    if (monthFilter) {
+      // Filter by specific month in the year
+      const endMonth = parseInt(monthFilter, 10);
+      const startMonth = new Date(`${yearFilter}-${monthFilter}-01`);
+
+      // Calculate end date (start of next month)
+      const endDate = new Date(startMonth);
+      endDate.setMonth(endDate.getMonth() + 1);
+
+      query = query.gte("quoted_at", startMonth.toISOString());
+      query = query.lt("quoted_at", endDate.toISOString());
+    } else {
+      // Filter by entire year
+      const endDate = new Date(`${parseInt(yearFilter) + 1}-01-01`);
+
+      query = query.gte("quoted_at", startDate.toISOString());
+      query = query.lt("quoted_at", endDate.toISOString());
+    }
+  } else if (monthFilter) {
+    // If only month is provided (no year), filter by the month in the current year
+    const currentYear = new Date().getFullYear();
+    const startMonth = new Date(`${currentYear}-${monthFilter}-01`);
+
+    // Calculate end date (start of next month)
+    const endDate = new Date(startMonth);
+    endDate.setMonth(endDate.getMonth() + 1);
+
+    query = query.gte("quoted_at", startMonth.toISOString());
+    query = query.lt("quoted_at", endDate.toISOString());
   }
 
   // Apply search filter if search query exists
@@ -89,13 +175,12 @@ export default async function QuoteRequestsPage({
   // and by requested_at (newest first)
   const { data: quoteRequests, error } = await query
     .order("status", { ascending: true })
-    .order("requested_at", { ascending: false });
+    .order("requested_at", { ascending: true });
 
   if (error) {
     console.error("Error fetching quote requests:", error);
     return (
       <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Quote Requests</h1>
         <Card>
           <CardHeader>
             <CardTitle>Error</CardTitle>
@@ -141,9 +226,7 @@ export default async function QuoteRequestsPage({
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">Quote Requests</h1>
-
+    <>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -174,10 +257,6 @@ export default async function QuoteRequestsPage({
         </Card>
       </div>
 
-      <div className="flex items-center gap-2">
-        <SearchQuoteRequests defaultValue={searchQuery} />
-      </div>
-
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -187,6 +266,7 @@ export default async function QuoteRequestsPage({
                 <TableHead>Address</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Sales Rep</TableHead>
+                <TableHead>Quote #</TableHead>
                 <TableHead>Requested At</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Quote Value</TableHead>
@@ -207,6 +287,7 @@ export default async function QuoteRequestsPage({
                     <TableCell>
                       {request.users ? request.users.full_name : "N/A"}
                     </TableCell>
+                    <TableCell>{request.leads.quote_number || "—"}</TableCell>
                     <TableCell>
                       {new Date(request.requested_at).toLocaleDateString()}
                     </TableCell>
@@ -220,8 +301,9 @@ export default async function QuoteRequestsPage({
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <StartWorkingButton
+                        <StartWorkingDialog
                           quoteRequestId={request.id}
+                          leadId={request.lead_id}
                           status={request.status}
                         />
                         <CompleteQuoteDialog
@@ -251,6 +333,6 @@ export default async function QuoteRequestsPage({
           </Table>
         </CardContent>
       </Card>
-    </div>
+    </>
   );
 }
