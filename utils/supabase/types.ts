@@ -12,7 +12,13 @@ export type UserRole =
 /**
  * Lead status enum type from the database
  */
-export type LeadStatus = "new" | "quote_made" | "negotiation" | "won" | "lost";
+export type LeadStatus =
+  | "new"
+  | "quote_made"
+  | "negotiation"
+  | "won"
+  | "lost"
+  | "unqualified";
 
 /**
  * Order status enum type from the database
@@ -55,6 +61,7 @@ export interface Lead {
   architect_name?: string;
   phone_number: string;
   quote_value: number;
+  quote_number?: string;
   status: LeadStatus;
   next_follow_up_date?: string;
   notes?: string;

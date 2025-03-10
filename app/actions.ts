@@ -163,6 +163,11 @@ export const addLeadAction = async (formData: FormData) => {
   const leadFoundThrough = formData.get("leadFoundThrough") as string;
   const notes = formData.get("notes") as string;
   const assignedToUserId = formData.get("assignedToUserId") as string;
+  const status = (formData.get("status") as string) || "new"; // Get status from form or default to "new"
+  const quoteNumber = formData.get("quoteNumber") as string;
+
+  // Check if this is an unqualified lead (which might not have assignment)
+  const isUnqualified = status === "unqualified";
 
   if (
     !name ||
@@ -170,7 +175,7 @@ export const addLeadAction = async (formData: FormData) => {
     !propertyType ||
     !phoneNumber ||
     !leadFoundThrough ||
-    !assignedToUserId
+    (!assignedToUserId && !isUnqualified) // Assignment is only required for non-unqualified leads
   ) {
     return { error: "Missing required fields" };
   }
@@ -186,8 +191,9 @@ export const addLeadAction = async (formData: FormData) => {
       architect_name: architectName || null,
       phone_number: phoneNumber,
       lead_found_through: leadFoundThrough,
-      status: "new", // Default status for new leads
+      status, // Use the status from form data
       notes,
+      quote_number: quoteNumber || null,
     })
     .select()
     .single();
@@ -197,17 +203,19 @@ export const addLeadAction = async (formData: FormData) => {
     return { error: leadError.message };
   }
 
-  // Create lead assignment
-  const { error: assignmentError } = await supabase
-    .from("lead_assignments")
-    .insert({
-      lead_id: lead.id,
-      user_id: assignedToUserId,
-    });
+  // Create lead assignment only if we have an assignedToUserId
+  if (assignedToUserId) {
+    const { error: assignmentError } = await supabase
+      .from("lead_assignments")
+      .insert({
+        lead_id: lead.id,
+        user_id: assignedToUserId,
+      });
 
-  if (assignmentError) {
-    console.error("Error assigning lead:", assignmentError);
-    return { error: assignmentError.message };
+    if (assignmentError) {
+      console.error("Error assigning lead:", assignmentError);
+      return { error: assignmentError.message };
+    }
   }
 
   return { success: true, leadId: lead.id };
@@ -236,7 +244,6 @@ export const updateLeadAction = async (
 ) => {
   const supabase = await createClient();
 
-  // Extract lead data from form
   const leadId = formData.get("leadId") as string;
   const name = formData.get("name") as string;
   const address = formData.get("address") as string;
@@ -245,14 +252,12 @@ export const updateLeadAction = async (
   const architectName = formData.get("architectName") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const leadFoundThrough = formData.get("leadFoundThrough") as string;
+  const status = formData.get("status") as string;
+  const currentStatus = formData.get("currentStatus") as string;
   const notes = formData.get("notes") as string;
   const assignedToUserId = formData.get("assignedToUserId") as string;
-  let status = formData.get("status") as string;
-  const currentStatus = formData.get("currentStatus") as string;
-  const quoteValueStr = formData.get("quoteValue") as string;
-
-  // Parse quote value (default to 0 if empty)
-  const quoteValue = quoteValueStr ? parseFloat(quoteValueStr) : 0;
+  const quoteValue = formData.get("quoteValue") as string;
+  const quoteNumber = formData.get("quoteNumber") as string;
 
   if (
     !leadId ||
@@ -261,73 +266,62 @@ export const updateLeadAction = async (
     !propertyType ||
     !phoneNumber ||
     !leadFoundThrough ||
-    !assignedToUserId ||
-    !status
+    !status ||
+    !assignedToUserId
   ) {
     return { error: "Missing required fields" };
   }
 
-  // Only allow admin users to set status to won or lost
+  // Check if user has permission to change to won or lost
+  const canChangeToWonLost =
+    userRole === "admin" || userRole === "manager" || userRole === "viewer";
+
   if (
-    userRole !== "admin" &&
     (status === "won" || status === "lost") &&
-    currentStatus !== status
+    currentStatus !== "won" &&
+    currentStatus !== "lost" &&
+    !canChangeToWonLost
   ) {
-    return { error: "Only administrators can mark leads as won or lost" };
+    return {
+      error: "You don't have permission to mark leads as won or lost",
+    };
   }
 
-  // Prepare update data
-  const updateData = {
-    name,
-    address,
-    property_type: propertyType,
-    company: company || null,
-    architect_name: architectName || null,
-    phone_number: phoneNumber,
-    lead_found_through: leadFoundThrough,
-    status,
-    notes,
-    quote_value: quoteValue,
-  };
-
-  console.log("Updating lead with data:", { leadId, ...updateData });
-
-  // Update lead
-  const { error: leadError } = await supabase
+  // Update lead data
+  const { error: updateError } = await supabase
     .from("leads")
-    .update(updateData)
+    .update({
+      name,
+      address,
+      property_type: propertyType,
+      company: company || null,
+      architect_name: architectName || null,
+      phone_number: phoneNumber,
+      lead_found_through: leadFoundThrough,
+      status,
+      notes,
+      quote_value: quoteValue ? parseFloat(quoteValue) : null,
+      quote_number: quoteNumber || null,
+    })
     .eq("id", leadId);
 
-  if (leadError) {
-    console.error("Error updating lead:", leadError);
-    return { error: leadError.message };
+  if (updateError) {
+    console.error("Error updating lead:", updateError);
+    return { error: updateError.message };
   }
 
-  // Check if assignment has changed
+  // Update assignment if it has changed
   const { data: currentAssignment } = await supabase
     .from("lead_assignments")
     .select("user_id")
     .eq("lead_id", leadId)
     .single();
 
-  // Only allow admins and lead_assigners to change assignments
-  if (
-    currentAssignment &&
-    currentAssignment.user_id !== assignedToUserId &&
-    userRole !== "admin" &&
-    userRole !== "lead_assigner"
-  ) {
-    return {
-      error:
-        "Only administrators and lead assigners can change lead assignments",
-      leadId,
-    };
-  }
-
-  // If assignment changed, update it
-  if (currentAssignment && currentAssignment.user_id !== assignedToUserId) {
-    // Delete current assignment
-    await supabase.from("lead_assignments").delete().eq("lead_id", leadId);
+  if (!currentAssignment || currentAssignment.user_id !== assignedToUserId) {
+    // Delete existing assignment
+    if (currentAssignment) {
+      await supabase.from("lead_assignments").delete().eq("lead_id", leadId);
+    }
 
     // Create new assignment
     const { error: assignmentError } = await supabase
@@ -338,12 +332,12 @@ export const updateLeadAction = async (
       });
 
     if (assignmentError) {
-      console.error("Error updating lead assignment:", assignmentError);
+      console.error("Error reassigning lead:", assignmentError);
       return { error: assignmentError.message };
     }
   }
 
-  return { success: true, leadId };
+  return { success: true };
 };
 
 export const getLeadAssignedUserAction = async (leadId: string) => {

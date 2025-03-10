@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { createServerClient } from "@/utils/supabase";
 import { getUserRole } from "@/utils/supabase/database";
 import { Lead, UserRole } from "@/utils/supabase/types";
@@ -25,12 +26,35 @@ import { FilterLeadsDialog } from "@/components/leads/filter-dialog";
 import { SearchLeads } from "@/components/leads/search-leads";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { CurrencyCell } from "@/components/tables/currency-cell";
+import { LeadsSkeleton } from "@/components/leads/leads-skeleton";
 
-export default async function LeadsPage({
+export default function LeadsPage({
   searchParams,
 }: {
   searchParams: Promise<any>;
 }) {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
+        <div className="flex items-center gap-3">
+          <FilterLeadsDialog />
+          <AddLeadDialog />
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <SearchLeads />
+      </div>
+
+      <Suspense fallback={<LeadsSkeleton />}>
+        <LeadsContent searchParams={searchParams} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
   // Cast searchParams to a usable type
   const params = (await searchParams) as {
     [key: string]: string | string[] | undefined;
@@ -64,6 +88,12 @@ export default async function LeadsPage({
       ? params.salesPersonId
       : null;
 
+  // Extract status filter
+  const statusFilter =
+    typeof params.status === "string" && params.status !== "all"
+      ? params.status
+      : null;
+
   // Extract search query
   const searchQuery =
     typeof params.search === "string" ? params.search.trim() : "";
@@ -81,23 +111,14 @@ export default async function LeadsPage({
     } else {
       // If no leads are assigned, return empty array
       return (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-            <div className="flex items-center gap-3">
-              <FilterLeadsDialog />
-              <AddLeadDialog />
-            </div>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>No Leads Found</CardTitle>
-              <CardDescription>
-                You don't have any leads assigned to you yet.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>No Leads Found</CardTitle>
+            <CardDescription>
+              You don't have any leads assigned to you yet.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       );
     }
   } else if (salesPersonFilter) {
@@ -113,25 +134,21 @@ export default async function LeadsPage({
     } else {
       // If no leads are assigned to the filtered sales person
       return (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-            <div className="flex items-center gap-3">
-              <FilterLeadsDialog />
-              <AddLeadDialog />
-            </div>
-          </div>
-          <Card>
-            <CardHeader>
-              <CardTitle>No Leads Found</CardTitle>
-              <CardDescription>
-                No leads are assigned to the selected sales person.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>No Leads Found</CardTitle>
+            <CardDescription>
+              No leads are assigned to the selected sales person.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       );
     }
+  }
+
+  // Apply status filter if it exists
+  if (statusFilter) {
+    query = query.eq("status", statusFilter);
   }
 
   // Apply search filter if search query exists
@@ -159,13 +176,14 @@ export default async function LeadsPage({
     })
   );
 
-  // Sort leads by status (new → quote_made → negotiation → won → lost)
+  // Sort leads by status (new → quote_made → negotiation → won → lost → unqualified)
   const sortOrder = {
     new: 1,
     quote_made: 2,
     negotiation: 3,
     won: 4,
     lost: 5,
+    unqualified: 6,
   };
 
   leadsWithAssignments.sort((a, b) => {
@@ -185,91 +203,84 @@ export default async function LeadsPage({
         return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
       case "lost":
         return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
+      case "unqualified":
+        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300";
     }
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
-        <div className="flex items-center gap-3">
-          <FilterLeadsDialog />
-          <AddLeadDialog />
-        </div>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <SearchLeads defaultValue={searchQuery} />
-      </div>
-
+  // If no leads found after applying filters
+  if (!leadsWithAssignments || leadsWithAssignments.length === 0) {
+    return (
       <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Property Type</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Quote Value</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="w-[70px]">
-                  {!["quote_maker"].includes(userRole) ? "Actions" : ""}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {leadsWithAssignments && leadsWithAssignments.length > 0 ? (
-                leadsWithAssignments.map((lead) => (
-                  <TableRow key={lead.id}>
-                    <TableCell className="font-medium">{lead.name}</TableCell>
-                    <TableCell>{lead.address}</TableCell>
-                    <TableCell className="capitalize">
-                      {lead.property_type}
-                    </TableCell>
-                    <TableCell>{lead.phone_number}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusBadgeColor(lead.status)}>
-                        {lead.status.replace("_", " ")}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <CurrencyCell value={lead.quote_value || 0} />
-                    </TableCell>
-                    <TableCell>
-                      {lead.lead_created_date
-                        ? new Date(lead.lead_created_date).toLocaleDateString()
-                        : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      {!["quote_maker"].includes(userRole) ? (
-                        <EditLeadDialog
-                          lead={lead}
-                          assignedToUserId={lead.assignedToUserId || ""}
-                          currentUserRole={userRole}
-                          currentUserId={user.id}
-                        />
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="text-center py-6 text-muted-foreground"
-                  >
-                    No leads found
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
+        <CardHeader>
+          <CardTitle>No Leads Found</CardTitle>
+          <CardDescription>
+            No leads found matching your criteria.
+          </CardDescription>
+        </CardHeader>
       </Card>
-    </div>
+    );
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Name</TableHead>
+              <TableHead>Address</TableHead>
+              <TableHead>Property Type</TableHead>
+              <TableHead>Phone</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Quote Value</TableHead>
+              <TableHead>Quote #</TableHead>
+              <TableHead>Created</TableHead>
+              <TableHead className="w-[70px]">
+                {!["quote_maker"].includes(userRole) ? "Actions" : ""}
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {leadsWithAssignments.map((lead) => (
+              <TableRow key={lead.id}>
+                <TableCell className="font-medium">{lead.name}</TableCell>
+                <TableCell>{lead.address}</TableCell>
+                <TableCell className="capitalize">
+                  {lead.property_type}
+                </TableCell>
+                <TableCell>{lead.phone_number}</TableCell>
+                <TableCell>
+                  <Badge className={getStatusBadgeColor(lead.status)}>
+                    {lead.status.replace("_", " ")}
+                  </Badge>
+                </TableCell>
+                <TableCell>
+                  <CurrencyCell value={lead.quote_value || 0} />
+                </TableCell>
+                <TableCell>{lead.quote_number || "—"}</TableCell>
+                <TableCell>
+                  {lead.lead_created_date
+                    ? new Date(lead.lead_created_date).toLocaleDateString()
+                    : "N/A"}
+                </TableCell>
+                <TableCell>
+                  {!["quote_maker"].includes(userRole) ? (
+                    <EditLeadDialog
+                      lead={lead}
+                      assignedToUserId={lead.assignedToUserId}
+                      currentUserRole={userRole}
+                      currentUserId={user.id}
+                    />
+                  ) : null}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

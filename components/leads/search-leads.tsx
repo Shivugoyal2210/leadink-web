@@ -8,12 +8,8 @@ import { Button } from "@/components/ui/button";
 import { useDebouncedCallback } from "use-debounce";
 import { Badge } from "@/components/ui/badge";
 
-interface SearchLeadsProps {
-  defaultValue?: string;
-}
-
-export function SearchLeads({ defaultValue = "" }: SearchLeadsProps) {
-  const [searchTerm, setSearchTerm] = useState(defaultValue);
+export function SearchLeads() {
+  const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -75,16 +71,16 @@ export function SearchLeads({ defaultValue = "" }: SearchLeadsProps) {
         )}
       </div>
 
-      {defaultValue && (
+      {searchParams.get("search") && (
         <Badge variant="outline" className="flex gap-1 items-center">
-          <span>Search: {defaultValue}</span>
+          <span>Search: {searchParams.get("search")}</span>
           <Button
             variant="ghost"
             size="icon"
             className="h-4 w-4 ml-1 rounded-full"
             onClick={clearSearch}
           >
-            ×
+            <X className="h-3 w-3" />
           </Button>
         </Badge>
       )}

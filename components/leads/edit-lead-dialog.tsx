@@ -49,11 +49,26 @@ const formSchema = z.object({
   architectName: z.string().optional(),
   phoneNumber: z.string().min(1, "Phone number is required"),
   leadFoundThrough: z.enum(["scanner", "ads", "social_media", "organic"]),
-  status: z.enum(["new", "quote_made", "negotiation", "won", "lost"]),
-  currentStatus: z.enum(["new", "quote_made", "negotiation", "won", "lost"]),
+  status: z.enum([
+    "new",
+    "quote_made",
+    "negotiation",
+    "won",
+    "lost",
+    "unqualified",
+  ]),
+  currentStatus: z.enum([
+    "new",
+    "quote_made",
+    "negotiation",
+    "won",
+    "lost",
+    "unqualified",
+  ]),
   notes: z.string().optional(),
   assignedToUserId: z.string().min(1, "Assignment is required"),
   quoteValue: z.string().optional(),
+  quoteNumber: z.string().optional(),
 });
 
 type SalesUser = {
@@ -99,8 +114,9 @@ export function EditLeadDialog({
       status: lead.status,
       currentStatus: lead.status,
       notes: lead.notes || "",
-      assignedToUserId: assignedToUserId,
+      assignedToUserId: assignedToUserId || "",
       quoteValue: lead.quote_value ? lead.quote_value.toString() : "",
+      quoteNumber: lead.quote_number || "",
     },
   });
 
@@ -159,11 +175,21 @@ export function EditLeadDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 p-0"
+          disabled={
+            // Disable for different roles unless they're the assigned person
+            currentUserRole === "quote_maker" ||
+            (currentUserRole === "sales_rep" &&
+              assignedToUserId !== currentUserId)
+          }
+        >
           <Edit2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Lead</DialogTitle>
           <DialogDescription>
@@ -314,15 +340,35 @@ export function EditLeadDialog({
                       name="quoteValue"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quote Value ({currencySymbol})</FormLabel>
+                          <FormLabel>Quote Value</FormLabel>
                           <FormControl>
-                            <Input
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="0.00"
-                              {...field}
-                            />
+                            <div className="relative">
+                              <span className="absolute left-2 top-2">
+                                {currencySymbol}
+                              </span>
+                              <Input
+                                type="number"
+                                className="pl-6"
+                                placeholder="0.00"
+                                {...field}
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="quoteNumber"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quote Number</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Quote number" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -374,6 +420,18 @@ export function EditLeadDialog({
                                 Lost{" "}
                                 {!canChangeToWonLost &&
                                   field.value !== "lost" &&
+                                  "(Admin only)"}
+                              </SelectItem>
+                              <SelectItem
+                                value="unqualified"
+                                disabled={
+                                  !canChangeToWonLost &&
+                                  field.value !== "unqualified"
+                                }
+                              >
+                                Unqualified{" "}
+                                {!canChangeToWonLost &&
+                                  field.value !== "unqualified" &&
                                   "(Admin only)"}
                               </SelectItem>
                             </SelectContent>

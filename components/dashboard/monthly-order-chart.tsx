@@ -128,11 +128,13 @@ export function MonthlyOrderChart({
               <ChartLegend content={<ChartLegendContent />} />
               <Bar
                 dataKey="Total Value"
+                stackId="a"
                 fill={chartConfig["Total Value"].color}
                 radius={[0, 0, 4, 4]}
               />
               <Bar
                 dataKey="Amount In"
+                stackId="a"
                 fill={chartConfig["Amount In"].color}
                 radius={[4, 4, 0, 0]}
               />

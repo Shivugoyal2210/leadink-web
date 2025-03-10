@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SlidersHorizontal } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 
@@ -30,14 +30,35 @@ type SalesUser = {
   role: string;
 };
 
+type LeadStatus =
+  | "all"
+  | "new"
+  | "quote_made"
+  | "negotiation"
+  | "won"
+  | "lost"
+  | "unqualified";
+
+const leadStatusOptions = [
+  { value: "all", label: "All Statuses" },
+  { value: "new", label: "New" },
+  { value: "quote_made", label: "Quote Made" },
+  { value: "negotiation", label: "Negotiation" },
+  { value: "won", label: "Won" },
+  { value: "lost", label: "Lost" },
+  { value: "unqualified", label: "Unqualified" },
+];
+
 export function FilterLeadsDialog() {
   const [open, setOpen] = useState(false);
   const [salesUsers, setSalesUsers] = useState<SalesUser[]>([]);
   const [selectedSalesPerson, setSelectedSalesPerson] = useState<string>("all");
+  const [selectedStatus, setSelectedStatus] = useState<LeadStatus>("all");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
-  const activeFilter = searchParams.get("salesPersonId");
+  const activeSalesPersonFilter = searchParams.get("salesPersonId");
+  const activeStatusFilter = searchParams.get("status");
 
   useEffect(() => {
     if (open) {
@@ -49,13 +70,19 @@ export function FilterLeadsDialog() {
       fetchSalesUsers();
     }
 
-    // Set the initially selected value based on the URL
-    if (activeFilter && activeFilter !== "all") {
-      setSelectedSalesPerson(activeFilter);
+    // Set the initially selected values based on the URL
+    if (activeSalesPersonFilter && activeSalesPersonFilter !== "all") {
+      setSelectedSalesPerson(activeSalesPersonFilter);
     } else {
       setSelectedSalesPerson("all");
     }
-  }, [open, activeFilter]);
+
+    if (activeStatusFilter && activeStatusFilter !== "all") {
+      setSelectedStatus(activeStatusFilter as LeadStatus);
+    } else {
+      setSelectedStatus("all");
+    }
+  }, [open, activeSalesPersonFilter, activeStatusFilter]);
 
   const handleApplyFilter = () => {
     setIsLoading(true);
@@ -69,6 +96,12 @@ export function FilterLeadsDialog() {
       params.delete("salesPersonId");
     }
 
+    if (selectedStatus && selectedStatus !== "all") {
+      params.set("status", selectedStatus);
+    } else {
+      params.delete("status");
+    }
+
     // Navigate with the updated search params
     router.push(`/leads?${params.toString()}`);
     setOpen(false);
@@ -77,30 +110,71 @@ export function FilterLeadsDialog() {
 
   const handleClearFilter = () => {
     setSelectedSalesPerson("all");
+    setSelectedStatus("all");
     const params = new URLSearchParams(searchParams.toString());
     params.delete("salesPersonId");
+    params.delete("status");
     router.push(`/leads?${params.toString()}`);
     setOpen(false);
   };
 
   const getSelectedUserName = () => {
-    if (!activeFilter) return null;
-    const user = salesUsers.find((user) => user.id === activeFilter);
+    if (!activeSalesPersonFilter || activeSalesPersonFilter === "all")
+      return null;
+    const user = salesUsers.find((user) => user.id === activeSalesPersonFilter);
     return user ? user.full_name : null;
   };
 
+  const getSelectedStatusLabel = () => {
+    if (!activeStatusFilter || activeStatusFilter === "all") return null;
+    const status = leadStatusOptions.find(
+      (option) => option.value === activeStatusFilter
+    );
+    return status ? status.label : null;
+  };
+
+  const handleRemoveSalesPersonFilter = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("salesPersonId");
+    router.push(`/leads?${params.toString()}`);
+  };
+
+  const handleRemoveStatusFilter = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("status");
+    router.push(`/leads?${params.toString()}`);
+  };
+
+  const activeFiltersCount =
+    (activeSalesPersonFilter && activeSalesPersonFilter !== "all" ? 1 : 0) +
+    (activeStatusFilter && activeStatusFilter !== "all" ? 1 : 0);
+
   return (
     <div className="flex items-center gap-2">
-      {activeFilter && getSelectedUserName() && (
+      {activeSalesPersonFilter && getSelectedUserName() && (
         <Badge variant="outline" className="flex gap-1 items-center">
           <span>Sales Person: {getSelectedUserName()}</span>
           <Button
             variant="ghost"
             size="icon"
             className="h-4 w-4 ml-1 rounded-full"
-            onClick={handleClearFilter}
+            onClick={handleRemoveSalesPersonFilter}
           >
-            ×
+            <X className="h-3 w-3" />
+          </Button>
+        </Badge>
+      )}
+
+      {activeStatusFilter && getSelectedStatusLabel() && (
+        <Badge variant="outline" className="flex gap-1 items-center">
+          <span>Status: {getSelectedStatusLabel()}</span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-4 w-4 ml-1 rounded-full"
+            onClick={handleRemoveStatusFilter}
+          >
+            <X className="h-3 w-3" />
           </Button>
         </Badge>
       )}
@@ -114,6 +188,9 @@ export function FilterLeadsDialog() {
           >
             <SlidersHorizontal className="h-4 w-4" />
             Filter
+            {activeFiltersCount > 0 && (
+              <span className="ml-1">({activeFiltersCount})</span>
+            )}
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
@@ -138,6 +215,27 @@ export function FilterLeadsDialog() {
                       {salesUsers.map((user) => (
                         <SelectItem key={user.id} value={user.id}>
                           {user.full_name} ({user.role.replace("_", " ")})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lead-status">Status</Label>
+                  <Select
+                    value={selectedStatus}
+                    onValueChange={(value) =>
+                      setSelectedStatus(value as LeadStatus)
+                    }
+                  >
+                    <SelectTrigger id="lead-status">
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {leadStatusOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

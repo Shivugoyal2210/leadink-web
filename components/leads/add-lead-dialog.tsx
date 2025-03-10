@@ -40,23 +40,40 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { toast } from "sonner";
 
 // Define form schema with Zod
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  address: z.string().min(1, "Address is required"),
-  propertyType: z.enum(["residential", "commercial"]),
-  company: z.string().optional(),
-  architectName: z.string().optional(),
-  phoneNumber: z.string().min(1, "Phone number is required"),
-  leadFoundThrough: z.enum(["scanner", "ads", "social_media", "organic"]),
-  notes: z.string().optional(),
-  assignedToUserId: z.string().min(1, "Assignment is required"),
-});
+const formSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    address: z.string().min(1, "Address is required"),
+    propertyType: z.enum(["residential", "commercial"]),
+    company: z.string().optional(),
+    architectName: z.string().optional(),
+    phoneNumber: z.string().min(1, "Phone number is required"),
+    leadFoundThrough: z.enum(["scanner", "ads", "social_media", "organic"]),
+    notes: z.string().optional(),
+    isUnqualified: z.boolean().default(false),
+    assignedToUserId: z.string().optional(),
+    quoteNumber: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // If lead is not unqualified, assignedToUserId is required
+      if (!data.isUnqualified && !data.assignedToUserId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: "Assignment is required for qualified leads",
+      path: ["assignedToUserId"],
+    }
+  );
 
 type SalesUser = {
   id: string;
@@ -82,7 +99,9 @@ export function AddLeadDialog() {
       phoneNumber: "",
       leadFoundThrough: "organic",
       notes: "",
+      isUnqualified: false,
       assignedToUserId: "",
+      quoteNumber: "",
     },
   });
 
@@ -103,9 +122,15 @@ export function AddLeadDialog() {
     setIsLoading(true);
 
     const formData = new FormData();
+    // Add all form values to formData except isUnqualified which we'll handle separately
     Object.entries(values).forEach(([key, value]) => {
-      if (value) formData.append(key, value);
+      if (key !== "isUnqualified" && value !== undefined) {
+        formData.append(key, value.toString());
+      }
     });
+
+    // Set the lead status based on isUnqualified
+    formData.append("status", values.isUnqualified ? "unqualified" : "new");
 
     try {
       const result = await addLeadAction(formData);
@@ -134,7 +159,7 @@ export function AddLeadDialog() {
           Add Lead
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add New Lead</DialogTitle>
           <DialogDescription>
@@ -252,6 +277,20 @@ export function AddLeadDialog() {
 
                   <FormField
                     control={form.control}
+                    name="quoteNumber"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Quote Number (Optional)</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Quote number" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="leadFoundThrough"
                     render={({ field }) => (
                       <FormItem>
@@ -281,6 +320,28 @@ export function AddLeadDialog() {
 
                   <FormField
                     control={form.control}
+                    name="isUnqualified"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel>Mark as Unqualified Lead</FormLabel>
+                          <FormDescription>
+                            This lead will be tagged as unqualified instead of
+                            new
+                          </FormDescription>
+                        </div>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name="assignedToUserId"
                     render={({ field }) => (
                       <FormItem>
@@ -288,9 +349,14 @@ export function AddLeadDialog() {
                         <Select
                           onValueChange={field.onChange}
                           defaultValue={field.value}
+                          disabled={form.watch("isUnqualified")}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger
+                              className={
+                                form.watch("isUnqualified") ? "opacity-50" : ""
+                              }
+                            >
                               <SelectValue placeholder="Select sales person" />
                             </SelectTrigger>
                           </FormControl>
