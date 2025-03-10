@@ -14,6 +14,9 @@ const nextConfig: NextConfig = {
     serverMinification: false,
     // Enable scrollRestoration in the app router
     scrollRestoration: true,
+    staleTimes: {
+      dynamic: 120,
+    },
   },
 };
 
