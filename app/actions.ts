@@ -421,6 +421,8 @@ export const completeQuoteRequestAction = async (formData: FormData) => {
   const quoteRequestId = formData.get("quoteRequestId") as string;
   const quoteValueStr = formData.get("quoteValue") as string;
   const leadId = formData.get("leadId") as string;
+  const quoteType =
+    (formData.get("quoteType") as "fresh" | "revisal") || "fresh";
 
   // Parse quote value (default to 0 if empty)
   const quoteValue = quoteValueStr ? parseFloat(quoteValueStr) : 0;
@@ -452,6 +454,7 @@ export const completeQuoteRequestAction = async (formData: FormData) => {
         quote_value: quoteValue,
         quoted_at: new Date().toISOString(),
         quote_maker_id: user.id,
+        type: quoteType,
       })
       .eq("id", quoteRequestId);
 
@@ -701,6 +704,8 @@ export async function submitQuoteRequestAction(formData: FormData) {
   "use server";
 
   const leadId = formData.get("leadId") as string;
+  const quoteType =
+    (formData.get("quoteType") as "fresh" | "revisal") || "fresh";
 
   if (!leadId) {
     return { error: "Lead ID is required" };
@@ -732,7 +737,7 @@ export async function submitQuoteRequestAction(formData: FormData) {
     sales_rep_id: salesRepId,
     status: "pending",
     quote_value: 0,
-    type: "fresh",
+    type: quoteType,
   });
 
   if (createError) {

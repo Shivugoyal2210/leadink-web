@@ -135,7 +135,7 @@ async function QuoteRequestsContent({
 
     if (monthFilter) {
       // Filter by specific month in the year
-      const endMonth = parseInt(monthFilter, 10);
+      const monthNum = parseInt(monthFilter, 10);
       const startMonth = new Date(`${yearFilter}-${monthFilter}-01`);
 
       // Calculate end date (start of next month)

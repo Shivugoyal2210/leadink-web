@@ -41,6 +41,11 @@ export type LeadFoundThrough = "scanner" | "ads" | "social_media" | "organic";
 export type QuoteRequestStatus = "pending" | "active" | "completed";
 
 /**
+ * Quote request type enum type from the database
+ */
+export type QuoteRequestType = "fresh" | "revisal";
+
+/**
  * User interface
  */
 export interface User {
@@ -108,4 +113,5 @@ export interface QuoteRequest {
   quoted_at?: string;
   status: QuoteRequestStatus;
   quote_value: number;
+  type: QuoteRequestType;
 }

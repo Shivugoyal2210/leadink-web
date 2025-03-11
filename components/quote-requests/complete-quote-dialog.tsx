@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { QuoteRequest } from "@/utils/supabase/types";
+import { QuoteRequest, QuoteRequestType } from "@/utils/supabase/types";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { completeQuoteRequestAction } from "@/app/actions";
 import { Check } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 interface CompleteQuoteDialogProps {
   quoteRequest: QuoteRequest;
@@ -31,6 +32,7 @@ export function CompleteQuoteDialog({
 }: CompleteQuoteDialogProps) {
   const [open, setOpen] = useState(false);
   const [quoteValue, setQuoteValue] = useState("");
+  const [quoteType, setQuoteType] = useState<QuoteRequestType>("fresh");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const router = useRouter();
@@ -41,6 +43,7 @@ export function CompleteQuoteDialog({
       setQuoteValue(
         quoteRequest.quote_value > 0 ? quoteRequest.quote_value.toString() : ""
       );
+      setQuoteType(quoteRequest.type || "fresh");
     }
   };
 
@@ -73,6 +76,7 @@ export function CompleteQuoteDialog({
     formData.append("quoteRequestId", quoteRequest.id);
     formData.append("quoteValue", numericValue.toString());
     formData.append("leadId", quoteRequest.lead_id);
+    formData.append("quoteType", quoteType);
 
     try {
       const result = await completeQuoteRequestAction(formData);
@@ -130,8 +134,35 @@ export function CompleteQuoteDialog({
               className="w-full"
               required
             />
-            {error && <p className="text-sm text-red-500">{error}</p>}
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="quoteType">Quote Type</Label>
+            <RadioGroup
+              id="quoteType"
+              value={quoteType}
+              onValueChange={(value: string) =>
+                setQuoteType(value as QuoteRequestType)
+              }
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="fresh" id="fresh" />
+                <Label htmlFor="fresh" className="cursor-pointer">
+                  Fresh
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="revisal" id="revisal" />
+                <Label htmlFor="revisal" className="cursor-pointer">
+                  Revisal
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {error && <p className="text-sm text-red-500">{error}</p>}
+
           <div className="flex justify-end gap-2">
             <Button
               type="button"
