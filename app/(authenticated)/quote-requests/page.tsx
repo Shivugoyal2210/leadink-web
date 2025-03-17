@@ -116,6 +116,9 @@ async function QuoteRequestsContent({
       ),
       users!quote_requests_sales_rep_id_fkey (
         full_name
+      ),
+      quote_makers:users!quote_requests_quote_maker_id_fkey (
+        full_name
       )
     `);
 
@@ -269,6 +272,7 @@ async function QuoteRequestsContent({
                 <TableHead>Quote #</TableHead>
                 <TableHead>Requested At</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Made By</TableHead>
                 <TableHead>Quote Value</TableHead>
                 <TableHead className="w-[100px]">Actions</TableHead>
               </TableRow>
@@ -280,7 +284,12 @@ async function QuoteRequestsContent({
                     <TableCell className="font-medium">
                       {request.leads.name}
                     </TableCell>
-                    <TableCell>{request.leads.address}</TableCell>
+                    <TableCell
+                      className="max-w-[150px] truncate"
+                      title={request.leads.address}
+                    >
+                      {request.leads.address}
+                    </TableCell>
                     <TableCell className="capitalize">
                       {request.type || request.leads.property_type}
                     </TableCell>
@@ -295,6 +304,11 @@ async function QuoteRequestsContent({
                       <Badge className={getStatusBadgeColor(request.status)}>
                         {request.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {request.quote_makers
+                        ? request.quote_makers.full_name
+                        : "—"}
                     </TableCell>
                     <TableCell>
                       <CurrencyCell value={request.quote_value || 0} />
@@ -316,6 +330,7 @@ async function QuoteRequestsContent({
                             quoted_at: request.quoted_at,
                             status: request.status,
                             quote_value: request.quote_value || 0,
+                            type: request.type,
                           }}
                         />
                       </div>

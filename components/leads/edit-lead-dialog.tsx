@@ -48,7 +48,14 @@ const formSchema = z.object({
   company: z.string().optional(),
   architectName: z.string().optional(),
   phoneNumber: z.string().min(1, "Phone number is required"),
-  leadFoundThrough: z.enum(["scanner", "ads", "social_media", "organic"]),
+  leadFoundThrough: z.enum([
+    "scanner",
+    "sunny",
+    "social_media",
+    "word_of_mouth",
+    "social_media_ads",
+    "architect",
+  ]),
   status: z.enum([
     "new",
     "quote_made",
@@ -110,7 +117,7 @@ export function EditLeadDialog({
       company: lead.company || "",
       architectName: lead.architect_name || "",
       phoneNumber: lead.phone_number,
-      leadFoundThrough: lead.lead_found_through,
+      leadFoundThrough: mapLegacyLeadSource(lead.lead_found_through),
       status: lead.status,
       currentStatus: lead.status,
       notes: lead.notes || "",
@@ -323,11 +330,19 @@ export function EditLeadDialog({
                             </FormControl>
                             <SelectContent>
                               <SelectItem value="scanner">Scanner</SelectItem>
-                              <SelectItem value="ads">Ads</SelectItem>
+                              <SelectItem value="sunny">Sunny</SelectItem>
                               <SelectItem value="social_media">
                                 Social Media
                               </SelectItem>
-                              <SelectItem value="organic">Organic</SelectItem>
+                              <SelectItem value="word_of_mouth">
+                                Word of Mouth
+                              </SelectItem>
+                              <SelectItem value="social_media_ads">
+                                Social Media Ads
+                              </SelectItem>
+                              <SelectItem value="architect">
+                                Architect
+                              </SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -520,4 +535,33 @@ export function EditLeadDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+// Helper function to map legacy lead sources to valid ones
+function mapLegacyLeadSource(
+  source: string
+):
+  | "scanner"
+  | "sunny"
+  | "social_media"
+  | "word_of_mouth"
+  | "social_media_ads"
+  | "architect" {
+  // Map old values to new values
+  switch (source) {
+    case "ads":
+      return "social_media_ads";
+    case "organic":
+      return "word_of_mouth";
+    case "scanner":
+    case "sunny":
+    case "social_media":
+    case "social_media_ads":
+    case "word_of_mouth":
+    case "architect":
+      return source as any;
+    default:
+      // Default to scanner if unknown value
+      return "scanner";
+  }
 }
