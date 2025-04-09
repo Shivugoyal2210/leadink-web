@@ -26,6 +26,17 @@ interface LeadsTableProps {
   totalPages: number;
 }
 
+// Function to safely format dates that might be undefined
+const formatDate = (dateString: string | undefined | null) => {
+  if (!dateString) return "—";
+  try {
+    return new Date(dateString).toLocaleDateString();
+  } catch (error) {
+    console.error("Error formatting date:", error);
+    return "—";
+  }
+};
+
 // Function to get badge color based on lead status
 const getStatusBadgeColor = (status: string) => {
   switch (status) {
@@ -83,6 +94,8 @@ export function LeadsTable({
             salesPersonId: searchParams.get("salesPersonId") || undefined,
             status: searchParams.get("status") || undefined,
             search: searchParams.get("search") || undefined,
+            sortBy: searchParams.get("sortBy") || undefined,
+            sortDir: searchParams.get("sortDir") || undefined,
           });
 
           if (moreLeads && moreLeads.length > 0) {
@@ -131,7 +144,7 @@ export function LeadsTable({
           <TableHead>Status</TableHead>
           <TableHead>Quote Value</TableHead>
           <TableHead>Quote #</TableHead>
-          <TableHead>Created</TableHead>
+          <TableHead>Follow-up</TableHead>
           <TableHead className="w-[70px]">Actions</TableHead>
         </TableRow>
       </TableHeader>
@@ -151,9 +164,7 @@ export function LeadsTable({
               <CurrencyCell value={lead.quote_value || 0} />
             </TableCell>
             <TableCell>{lead.quote_number || "—"}</TableCell>
-            <TableCell>
-              {new Date(lead.lead_created_date).toLocaleDateString()}
-            </TableCell>
+            <TableCell>{formatDate(lead.next_follow_up_date)}</TableCell>
             <TableCell>
               <div className="flex items-center gap-1">
                 {!["quote_maker"].includes(userRole) && (

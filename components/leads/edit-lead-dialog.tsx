@@ -76,6 +76,7 @@ const formSchema = z.object({
   assignedToUserId: z.string().min(1, "Assignment is required"),
   quoteValue: z.string().optional(),
   quoteNumber: z.string().optional(),
+  nextFollowUpDate: z.string().optional(),
 });
 
 type SalesUser = {
@@ -124,6 +125,7 @@ export function EditLeadDialog({
       assignedToUserId: assignedToUserId || "",
       quoteValue: lead.quote_value ? lead.quote_value.toString() : "",
       quoteNumber: lead.quote_number || "",
+      nextFollowUpDate: lead.next_follow_up_date || "",
     },
   });
 
@@ -384,6 +386,25 @@ export function EditLeadDialog({
                           <FormLabel>Quote Number</FormLabel>
                           <FormControl>
                             <Input placeholder="Quote number" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="nextFollowUpDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Follow-up Date</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="date"
+                              placeholder="Select date"
+                              {...field}
+                              value={field.value || ""}
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

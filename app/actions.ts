@@ -258,6 +258,7 @@ export const updateLeadAction = async (
   const assignedToUserId = formData.get("assignedToUserId") as string;
   const quoteValue = formData.get("quoteValue") as string;
   const quoteNumber = formData.get("quoteNumber") as string;
+  const nextFollowUpDate = formData.get("nextFollowUpDate") as string;
 
   if (
     !leadId ||
@@ -302,6 +303,9 @@ export const updateLeadAction = async (
       notes,
       quote_value: quoteValue ? parseFloat(quoteValue) : null,
       quote_number: quoteNumber || null,
+      next_follow_up_date: nextFollowUpDate
+        ? new Date(nextFollowUpDate).toISOString()
+        : null,
     })
     .eq("id", leadId);
 
@@ -557,6 +561,8 @@ export async function getMoreLeadsAction(
     salesPersonId?: string;
     status?: string;
     search?: string;
+    sortBy?: string;
+    sortDir?: string;
   }
 ) {
   "use server";
@@ -592,10 +598,14 @@ export async function getMoreLeadsAction(
     );
   }
 
-  // Apply pagination
+  // Get sort parameters (defaulting to status ascending if not provided)
+  const sortBy = filters.sortBy || "status";
+  const sortDir = filters.sortDir === "desc" ? false : true; // Convert to boolean for ascending
+
+  // Apply pagination and sorting
   const { data: leads, error: leadsError } = await query
     .range((page - 1) * pageSize, page * pageSize - 1)
-    .order("status", { ascending: true })
+    .order(sortBy, { ascending: sortDir })
     .order("lead_created_date", { ascending: false });
 
   if (leadsError || !leads || leads.length === 0) {

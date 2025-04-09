@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { AddLeadDialog } from "@/components/leads/add-lead-dialog";
 import { FilterLeadsDialog } from "@/components/leads/filter-dialog";
 import { SearchLeads } from "@/components/leads/search-leads";
+import { SortLeads } from "@/components/leads/sort-leads";
 import { EditLeadDialog } from "@/components/leads/edit-lead-dialog";
 import { CurrencyCell } from "@/components/tables/currency-cell";
 import { LeadsSkeleton } from "@/components/leads/leads-skeleton";
@@ -40,6 +41,7 @@ export default function LeadsPage({
         <h1 className="text-3xl font-bold tracking-tight">Leads</h1>
         <div className="flex items-center gap-3">
           <FilterLeadsDialog />
+          <SortLeads />
           <AddLeadDialog />
         </div>
       </div>
@@ -104,6 +106,10 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
   // Extract search query
   const searchQuery =
     typeof params.search === "string" ? params.search.trim() : "";
+
+  // Extract sort parameters
+  const sortBy = typeof params.sortBy === "string" ? params.sortBy : "status";
+  const sortDir = typeof params.sortDir === "string" ? params.sortDir : "asc";
 
   // For sales_rep, only show leads assigned to them
   if (userRole === "sales_rep") {
@@ -175,7 +181,7 @@ async function LeadsContent({ searchParams }: { searchParams: Promise<any> }) {
   // Apply pagination to data query
   const { data: leads } = await dataQuery
     .range((page - 1) * pageSize, page * pageSize - 1)
-    .order("status", { ascending: true })
+    .order(sortBy, { ascending: sortDir === "asc" })
     .order("lead_created_date", { ascending: false });
 
   // If no leads found
